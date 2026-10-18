@@ -46,7 +46,11 @@ def load_editorial_review(path, source):
                 group = reading_groups.get(item.get('reading_group_id'), {})
                 if section != 'content_corrections' or item.get('section') != 'clean_reading' or set(group.get('source_ids', [])) != set(ids) or not set(extra_ids).issubset(set(group.get('linked_layout_source_ids', []))):
                     raise PipelineError('额外版面证据必须属于当前阅读组已有的版面关联，不能引用无关片段。')
-            evidence_ids = ids + extra_ids
+            corrected_ids = item.get('corrected_source_ids', ids)
+            if 'corrected_source_ids' in item:
+                if section != 'content_corrections' or item.get('section') == 'clean_reading' or not isinstance(corrected_ids, list) or not corrected_ids or any(identifier not in blocks for identifier in corrected_ids) or len(set(corrected_ids)) != len(corrected_ids):
+                    raise PipelineError('学习条目的新引用必须完整有效；正文来源映射不能改写。')
+            evidence_ids = list(dict.fromkeys(ids + extra_ids + corrected_ids))
             verification = item.get('verification', {})
             pages = verification.get('pages')
             hashes = verification.get('page_image_sha256')
@@ -96,6 +100,9 @@ def load_editorial_review(path, source):
                     block = blocks.get(quote.get('block_id')) if isinstance(quote, dict) else None
                     if not block or block['id'] not in evidence_ids or quote.get('page') != block['page'] or not isinstance(quote.get('quote'), str) or not quote['quote'] or quote['quote'] not in block['text']:
                         raise PipelineError('正文修订的逐字来源证据不匹配。')
+                quoted = {quote['block_id'] for quote in item.get('source_evidence', [])}
+                if not (set(corrected_ids) - set(ids)).issubset(quoted):
+                    raise PipelineError('每个新增学习条目引用都须有对应逐字来源证据。')
             elif section == 'annotation_corrections':
                 if item.get('field') != 'editing_notes' or not isinstance(item.get('reading_group_id'), str) or not item['reading_group_id'] or not isinstance(item.get('why'), str) or not item['why']:
                     raise PipelineError('编辑说明修订须指定阅读组、editing_notes字段及原因。')
@@ -198,23 +205,37 @@ def apply_editorial_review(learning, source, bundle, directory, *, require_exact
     for correction in bundle.get('content_corrections', []):
         locations, already = [], []
         for prefix, sections in (('', learning), ('consolidated.', learning.get('consolidated', {}))):
-            for index, item in enumerate(sections.get(correction['section'], [])):
-                if not isinstance(item, dict) or set(item.get('source_ids', [])) != set(correction['source_ids']):
+            targets = [(f'{prefix}{correction["section"]}[{index}]', item)
+                       for index, item in enumerate(sections.get(correction['section'], []))]
+            if correction['section'] == 'thematic_paragraphs':
+                targets = [(f'{prefix}thematic_sections[{section_index}].paragraphs[{paragraph_index}]', paragraph)
+                           for section_index, section in enumerate(sections.get('thematic_sections', []))
+                           for paragraph_index, paragraph in enumerate(section.get('paragraphs', []))]
+            for target, item in targets:
+                expected_ids = correction.get('corrected_source_ids', correction['source_ids'])
+                if not isinstance(item, dict) or set(item.get('source_ids', [])) not in (set(correction['source_ids']), set(expected_ids)):
                     continue
                 if correction['section'] == 'clean_reading' and item.get('id') != correction.get('reading_group_id'):
                     continue
                 value = item.get(correction['field'])
                 if value not in (correction['original'], correction['corrected']):
                     continue
-                location = f'{prefix}{correction["section"]}[{index}].{correction["field"]}'
-                (locations if value == correction['original'] else already).append(location)
+                location = f'{target}.{correction["field"]}'
+                done = value == correction['corrected'] and item.get('source_ids', []) == expected_ids
+                (already if done else locations).append(location)
                 item[correction['field']] = correction['corrected']
+                if 'corrected_source_ids' in correction:
+                    item['source_ids'] = list(expected_ids)
                 if correction['section'] == 'clean_reading':
                     _synchronize_reading_correction(item, correction, learning, bundle)
         if require_exact and not locations and not already:
             raise PipelineError(f'审校修订{correction.get("id", correction["section"])}未匹配任何原值或已修订值；已停止另存，原版本保持不变。')
         records.append({**correction, 'status': 'applied_exact_match' if locations else ('already_applied' if already else 'retained_as_grounding_constraint'),
                         'matches': len(locations), 'locations': locations, 'already_applied_locations': already})
+    for sections in (learning, learning.get('consolidated', {})):
+        for section in sections.get('thematic_sections', []):
+            section['source_ids'] = list(dict.fromkeys(identifier for paragraph in section.get('paragraphs', [])
+                                                       for identifier in paragraph.get('source_ids', [])))
     for correction in bundle.get('annotation_corrections', []):
         matches = [item for item in learning.get('clean_reading', []) if item.get('id') == correction['reading_group_id']
                    and set(item.get('source_ids', [])) == set(correction['source_ids'])]

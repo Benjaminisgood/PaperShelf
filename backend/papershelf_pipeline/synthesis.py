@@ -530,8 +530,16 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
              'document_id':block.get('document_id','main'), 'text':block['text']}
             for block in source['blocks']]
         layout_observations = list(source.get('layout_observations', []))
+        coverage_contract = []
+        for entry in batch:
+            research_ids = sorted(identifier for identifier in item_ids(entry['value'])
+                                  if source_map[identifier].get('reading_role') not in nonresearch_roles)
+            coverage_contract.append({'input_id': entry['input_id'], 'scientific_source_ids': research_ids,
+                                      'allowed_actions': ['retained', 'merged'] if research_ids else ['retained', 'merged', 'excluded']})
         prompt = {'task': '将下列完整初稿条目按科学主题合并，保留全部独有条件和证据。主题正文使用paragraphs[{text,source_ids,kind}]，其他章节保持输入键结构，不将题目与其必要条件分离。',
                   'schema': schema, 'items': batch, 'source_evidence':source_evidence,
+                  'coverage_contract': coverage_contract,
+                  'coverage_instruction': '每项action必须属于该input_id的allowed_actions。scientific_source_ids非空就不是出版元信息；重复科学内容也不能excluded，必须完整保留独有内容与证据后merged。错误名称须据原文纠正并retained/merged，不得删除科学条目。',
                   'allowed_sections':allowed_sections, 'empty_sections':empty_sections,
                   'section_contract':'只整理本批allowed_sections中的输入章节；empty_sections每一项必须返回[]。完整原文仅用于核对当前条目，不能据此新增本批没有输入的章节。',
                   'verified_layout_observations':layout_observations,

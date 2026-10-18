@@ -99,6 +99,8 @@ python -m papershelf_pipeline revise --manifest /absolute/run/manifest.json \
 
 仅修改编辑备注时使用 `annotation_corrections`，指定 `reading_group_id`、`field: editing_notes`、完整 `original`/`corrected` 数组及同样的来源核验信息。行内公式恢复可补充 `additional_evidence_source_ids`，但这些 ID 必须已在该阅读组的 `linked_layout_source_ids` 中，且逐字引文、文档与原页图哈希都须通过验证。后续 AI 校订从上一版实际展示的综合条目继续，旧模型卡片留在 `draft/` 中，不重新作为当前草稿。
 
+主题正文的精确修正用 `section: thematic_paragraphs`、`field: text` 定位段落。普通学习条目可提供 `corrected_source_ids` 同步修正引用，每个新加入的来源必须附逐字 `source_evidence`，所有原、新来源都须通过页图核验；主题的来源并集会随段落重算。全文阅读组的来源映射不能通过该字段改写。
+
 `--provider-config` 可选择无密钥的当前服务配置。`--editorial-corrections` 可提供独立核验记录：绑定原 PDF SHA256、来源 ID、实际页图 SHA256、审阅者和核验方法；公式修正保留前后值，正文修正只匹配精确旧值。核验过的公式按原文位置重新进入全文 MD，未可靠重建的公式保留原始证据，不以乱码冒充可读 LaTeX。新版本的 Graphiti/Paper2Agent 回执仍明确引用之前的独立任务，不隐式重写远端知识库或重复执行科学工具。
 
 复核后可在请求提供 `review_corrections_path`（精确原值/新值/原因/来源 ID）和 `layout_observations_path`（原 PDF SHA256/来源 ID/原版面观察/核验记录）。前者修改讲解文字、逐句译述或公式及符号解释，保存 `chunks/*-before-review.json` 与 `learning-review.json`；后者把经独立核验的提取误差或原文冲突显式提供给生成器。字段事实使用独立的 `extraction_corrections_path`：每项须有 paper、source_sha256、record_id、field、完整 original/corrected 单元格、reason、actor；源文件及原值匹配后再次严格核验类型与逐字引文/页码，并通过既有数据集审阅机制保留哈希审计链。它在所有导出和 Agent 生成前应用，保存 `extraction-before-review.json`、`extraction-review.json`，明确不代表研究者科学验收。旧运行不会被覆写，未核验图像不得被称作已阅读。

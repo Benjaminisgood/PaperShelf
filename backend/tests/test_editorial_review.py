@@ -138,6 +138,47 @@ class EditorialReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(PipelineError, '无关片段'):
                 load_editorial_review(path, source)
 
+    def test_thematic_correction_matches_paragraph_evidence_and_keeps_precise_location(self):
+        source = {'sha256': 'hash', 'blocks': [{'id': 'a', 'page': 1}, {'id': 'b', 'page': 2}]}
+        learning = {'thematic_sections': [{'title': 'Topic', 'paragraphs': [
+            {'text': 'Old claim', 'source_ids': ['a']}, {'text': 'Old claim', 'source_ids': ['b']}]}]}
+        bundle = {'reviewer': 'fixture', 'content_corrections': [
+            {'section': 'thematic_paragraphs', 'field': 'text', 'source_ids': ['a'], 'original': 'Old claim',
+             'corrected': 'Source-reviewed claim', 'why': 'Source evidence'}]}
+        with tempfile.TemporaryDirectory() as name:
+            apply_editorial_review(learning, source, bundle, Path(name), require_exact=True)
+        self.assertEqual(learning['thematic_sections'][0]['paragraphs'][0]['text'], 'Source-reviewed claim')
+        self.assertEqual(learning['thematic_sections'][0]['paragraphs'][1]['text'], 'Old claim')
+        self.assertEqual(learning['thematic_sections'][0]['source_ids'], ['a', 'b'])
+        self.assertEqual(learning['editorial_review']['records'][0]['locations'], ['thematic_sections[0].paragraphs[0].text'])
+
+    def test_corrected_card_citations_require_full_source_evidence_and_replay_exactly(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            page = root / 'page.png'
+            page.write_bytes(b'reviewed page')
+            source = {'sha256': 'hash', 'blocks': [{'id': 'a', 'page': 1, 'text': 'Method.'},
+                                                  {'id': 'b', 'page': 1, 'text': 'Total duration was 491 s.'}],
+                      'figures': [{'page': 1, 'path': str(page)}]}
+            learning = {'findings': [{'title': 'Old title', 'body': 'Old duration', 'source_ids': ['a']}]}
+            bundle = {'source_sha256': 'hash', 'reviewer': 'fixture', 'content_corrections': []}
+            for field, old, new in [('body', 'Old duration', 'Total duration was 491 s.'), ('title', 'Old title', 'Timing')]:
+                bundle['content_corrections'].append({'section': 'findings', 'field': field, 'original': old, 'corrected': new,
+                    'source_ids': ['a'], 'corrected_source_ids': ['a', 'b'], 'why': 'Restore complete timing evidence',
+                    'source_evidence': [{'block_id': 'b', 'page': 1, 'quote': 'Total duration was 491 s.'}],
+                    'verification': {'pages': [1], 'page_image_sha256': {'1': sha256(page)}, 'method': 'fixture review'}})
+            path = root / 'review.json'
+            write_json(path, bundle)
+            loaded = load_editorial_review(path, source)
+            apply_editorial_review(learning, source, loaded, root, require_exact=True)
+            self.assertEqual(learning['findings'], [{'title': 'Timing', 'body': 'Total duration was 491 s.', 'source_ids': ['a', 'b']}])
+            apply_editorial_review(learning, source, loaded, root, require_exact=True)
+            self.assertTrue(all(r['status'] == 'already_applied' for r in learning['editorial_review']['records']))
+            bundle['content_corrections'][0]['source_evidence'] = []
+            write_json(path, bundle)
+            with self.assertRaisesRegex(PipelineError, '新增学习条目引用'):
+                load_editorial_review(path, source)
+
     def test_source_bound_caveat_is_visible_beside_original_and_translation_without_rewriting(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
