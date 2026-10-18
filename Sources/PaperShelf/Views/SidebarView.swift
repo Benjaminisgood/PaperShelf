@@ -47,10 +47,30 @@ struct SidebarView: View {
     }
 
     private func row(_ title: String, icon: String, filter: String) -> some View {
-        HStack {
-            Label(LocalizedStringKey(title), systemImage: icon); Spacer()
+        HStack(spacing: 8) {
+            SidebarIcon(name: icon)
+            Text(LocalizedStringKey(title)).lineLimit(1)
+            Spacer()
             if store.count(filter) > 0 { Text("\(store.count(filter))").monospacedDigit().font(.caption).foregroundStyle(.secondary) }
-        }.tag(filter)
+        }
+        .contentShape(Rectangle())
+        .tag(filter)
+    }
+}
+
+// Keep the icon's width and foreground explicit while macOS updates source-list
+// rows during live window moves and resizing, instead of using Label's icon slot.
+private struct SidebarIcon: View {
+    let name: String
+    var color: Color = .primary
+
+    var body: some View {
+        Image(systemName: name)
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(color)
+            .frame(width: 20, height: 20)
+            .fixedSize()
+            .accessibilityHidden(true)
     }
 }
 
@@ -60,8 +80,8 @@ private struct TagSidebarRow: View {
     @State private var isTargeted = false
 
     var body: some View {
-        HStack {
-            Image(systemName: "tag.fill").foregroundStyle(store.tagColor(name))
+        HStack(spacing: 8) {
+            SidebarIcon(name: "tag.fill", color: store.tagColor(name))
             Text(name).lineLimit(1); Spacer()
             if store.count("t:" + name) > 0 { Text("\(store.count("t:" + name))").monospacedDigit().font(.caption).foregroundStyle(.secondary) }
         }
@@ -135,8 +155,10 @@ private struct CollectionSidebarRow: View {
     private var children: [LibraryCollection] { store.sortedCollections(parent: collection.id) }
     private var siblings: [LibraryCollection] { store.sortedCollections(parent: collection.parentID) }
     private var label: some View {
-        HStack {
-            Label(collection.name, systemImage: "folder").lineLimit(1); Spacer()
+        HStack(spacing: 8) {
+            SidebarIcon(name: "folder")
+            Text(collection.name).lineLimit(1)
+            Spacer()
             if store.count("c:\(collection.id)") > 0 { Text("\(store.count("c:\(collection.id)"))").monospacedDigit().font(.caption).foregroundStyle(.secondary) }
         }
         .frame(minHeight: 22)

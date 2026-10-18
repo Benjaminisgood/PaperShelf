@@ -148,14 +148,17 @@ def review_summary(manifest_path, corrections_path, paragraph_corrections_path=N
         artifacts = manifest['artifacts']
         artifacts['summary_review'] = str(directory / 'summary-review.json')
         artifacts['learning_before_summary_review'] = str(directory / 'learning-before-summary-review.json')
-        artifacts.update(render_guide(source, result, extraction, directory, manifest['warnings']))
+        outputs = set(request.get('outputs', ['guide', 'markdown', 'dataset', 'agent']))
+        formats = ({'html'} if 'guide' in outputs else set()) | ({'markdown'} if 'markdown' in outputs else set())
+        artifacts.update(render_guide(source, result, extraction, directory, manifest['warnings'], formats=formats))
         if request.get('book', {}).get('enabled', bool(request.get('book'))):
             from .book import render_book
-            artifacts.update(render_book(source, result, extraction, request['book'], directory, manifest['warnings']))
-        # Refresh portable agent code with current validated implementation.
-        shutil.rmtree(directory / 'agent')
-        artifacts['agent'] = create_agent(source, extraction, request, directory)
-        artifacts['mcp'] = str(directory / 'agent' / 'mcp.json')
+            artifacts.update(render_book(source, result, extraction, request['book'], directory, manifest['warnings'], formats=formats))
+        if 'agent' in outputs:
+            # Refresh only an explicitly requested Agent in the new version.
+            shutil.rmtree(directory / 'agent', ignore_errors=True)
+            artifacts['agent'] = create_agent(source, extraction, request, directory)
+            artifacts['mcp'] = str(directory / 'agent' / 'mcp.json')
         # Integration receipts remain unchanged evidence of their originating runs.
         manifest['summary_review'] = audit
         manifest['status'] = 'partial' if manifest.get('integration_errors') else 'completed'

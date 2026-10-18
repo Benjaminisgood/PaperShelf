@@ -60,7 +60,7 @@ def math_html(latex: str, warnings: list) -> str:
         return f'<pre aria-label="LaTeX 公式">{esc(latex)}</pre>'
 
 
-def render_guide(source: dict, learning: dict, extraction: dict, run_dir: Path, warnings: list) -> dict:
+def render_guide(source: dict, learning: dict, extraction: dict, run_dir: Path, warnings: list, *, formats=None) -> dict:
     from .guide_interactions import normalized_label
     # Keep draft cards in learning.json while presenting the full-document edit.
     learning = {**learning, **learning.get('consolidated', {})}
@@ -237,12 +237,18 @@ def render_guide(source: dict, learning: dict, extraction: dict, run_dir: Path, 
     out.append(f'</section><footer>PaperShelf · 源文件 SHA256 {esc(source["sha256"])}<br>离线单文件，无远程脚本、字体或跟踪请求。</footer></article></main><dialog id="image-dialog"><button id="close-image">关闭大图</button><img alt="原版面预览"></dialog><script data-papershelf-calculator>{CALCULATOR_JS}</script></body></html>')
     html_path = run_dir / 'learning.html'
     markdown_path = run_dir / 'learning.md'
-    from .guide_interactions import enrich_html
-    content,interaction_warnings = enrich_html(''.join(out),source,learning)
-    warnings.extend(item for item in interaction_warnings if item not in warnings)
-    if interaction_warnings:
-        extra = '<aside class="callout warning"><h3>引用核验缺口</h3><ul>'+''.join(f'<li>{esc(item)}</li>' for item in interaction_warnings)+'</ul></aside>'
-        content = content.replace('<section id="sources">',extra+'<section id="sources">',1)
-    html_path.write_text(content,encoding='utf-8')
-    markdown_path.write_text('\n'.join(md),encoding='utf-8')
-    return {'html':str(html_path),'markdown':str(markdown_path)}
+    formats = {'html', 'markdown'} if formats is None else set(formats)
+    artifacts = {}
+    if 'html' in formats:
+        from .guide_interactions import enrich_html
+        content,interaction_warnings = enrich_html(''.join(out),source,learning)
+        warnings.extend(item for item in interaction_warnings if item not in warnings)
+        if interaction_warnings:
+            extra = '<aside class="callout warning"><h3>引用核验缺口</h3><ul>'+''.join(f'<li>{esc(item)}</li>' for item in interaction_warnings)+'</ul></aside>'
+            content = content.replace('<section id="sources">',extra+'<section id="sources">',1)
+        html_path.write_text(content,encoding='utf-8')
+        artifacts['html'] = str(html_path)
+    if 'markdown' in formats:
+        markdown_path.write_text('\n'.join(md),encoding='utf-8')
+        artifacts['markdown'] = str(markdown_path)
+    return artifacts

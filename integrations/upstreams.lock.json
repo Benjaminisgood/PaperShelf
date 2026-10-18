@@ -19,5 +19,12 @@
     "branch": "main",
     "commit": "a107b622205733c0a53617ce0cd79fe4461cdb35",
     "license": "Apache-2.0"
+  },
+  "ppt-master": {
+    "url": "https://github.com/hugohe3/ppt-master.git",
+    "path": "integrations/ppt-master",
+    "branch": "main",
+    "commit": "b113d23720260c411ee47b2b05a73615f954deeb",
+    "license": "MIT"
   }
 }

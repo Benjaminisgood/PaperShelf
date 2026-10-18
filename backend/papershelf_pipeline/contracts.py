@@ -95,6 +95,19 @@ def validate_request(request: dict) -> dict:
         request["mode"] = "offline"
     if request["mode"] not in {"offline", "llm"}:
         raise PipelineError("mode 必须为 offline 或 llm。")
+    if 'outputs' in request:
+        outputs = request['outputs']
+        allowed = {'guide', 'markdown', 'source', 'dataset', 'agent', 'presentation'}
+        if (not isinstance(outputs, list) or not outputs
+                or any(not isinstance(item, str) or item not in allowed for item in outputs)
+                or len(set(outputs)) != len(outputs)):
+            raise PipelineError('outputs 必须是非空、无重复的成果数组：guide/markdown/source/dataset/agent/presentation。')
+        # Source and Agent preparation are entirely local even when the user's
+        # preferred reading mode is AI. No provider needs to be configured.
+        if set(outputs) <= {'source', 'agent'}:
+            request['mode'] = 'offline'
+        if 'dataset' not in outputs:
+            request['fields'] = []
     request["fields"] = validate_fields(request.get("fields", []))
     from .dataset import validate_fields as validate_dataset_fields
     validate_dataset_fields(request["fields"])
@@ -107,7 +120,7 @@ def validate_request(request: dict) -> dict:
         elif isinstance(value,list):
             for item in value:
                 reject_credentials(item)
-    for section in ('provider','graphiti','paper2agent'):
+    for section in ('provider','graphiti','paper2agent','presentation'):
         reject_credentials(request.get(section,{}))
     return request
 

@@ -65,6 +65,7 @@ def _now() -> str:
 
 def integration_status(config: dict | None = None) -> dict:
     """Inspect installed code, never connect to a provider or expose credentials."""
+    from .presentation import presentation_status
     root = _root()
     lock_path = root / "integrations/upstreams.lock.json"
     pins = json.loads(lock_path.read_text()) if lock_path.exists() else {}
@@ -77,6 +78,7 @@ def integration_status(config: dict | None = None) -> dict:
     skill = root / "integrations/Paper2Agent/skills/paper2agent/SKILL.md"
     return {"python": sys.executable, "python_version": sys.version.split()[0],
             "packages": packages, "upstreams": pins,
+            "ppt_master": presentation_status(),
             "paper2agent": {"skill_present": skill.is_file(),
                             "codex": shutil.which("codex"), "claude": shutil.which("claude")},
             "graphiti": {"configured": bool(graph.get("uri") or graph.get("backend") == "falkordb"),

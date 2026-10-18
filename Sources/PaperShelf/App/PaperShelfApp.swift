@@ -45,7 +45,7 @@ struct PaperShelfApp: App {
             CommandGroup(replacing: .appInfo) {
                 Button("关于 PaperShelf") {
                     NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "PaperShelf", .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.4.0",
-                        .credits: NSAttributedString(string: "原生文献管理与研读工作台\nSwiftUI · SQLite · PDFKit\nMarkItDown · Paper2Agent · Graphiti")])
+                        .credits: NSAttributedString(string: "原生文献管理与研读工作台\nSwiftUI · SQLite · PDFKit\nMarkItDown · Paper2Agent · Graphiti · PPT Master")])
                 }
             }
         }

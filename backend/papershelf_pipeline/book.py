@@ -50,9 +50,16 @@ def chapter_plan(source:dict,config:dict)->list[dict]:
     return chapters
 
 
-def render_book(source,learning,extraction,config,run_dir,warnings):
+def render_book(source,learning,extraction,config,run_dir,warnings,*,formats=None):
     from .rendering import render_guide, CSS
+    formats = {'html','markdown'} if formats is None else set(formats)
+    if not formats or not formats <= {'html','markdown'}:
+        raise PipelineError('章节输出格式必须为 html 或 markdown。')
     chapters = chapter_plan(source,config)
+    suffix = 'html' if 'html' in formats else 'md'
+    for chapter in chapters:
+        chapter['file'] = f'chapters/{chapter["id"]}/learning.{suffix}'
+        chapter['files'] = {kind:f'chapters/{chapter["id"]}/learning.{"html" if kind=="html" else "md"}' for kind in sorted(formats)}
     owner = {}
     for chapter in chapters:
         for block in source['blocks']:
@@ -79,8 +86,8 @@ def render_book(source,learning,extraction,config,run_dir,warnings):
         for collection in ('pages','blocks','raw_blocks','figures','figure_crops','figure_inventory','reading_blocks','reading_main_blocks','reading_fragments','reading_excluded'):
             if collection in local_source:
                 local_source[collection] = [item for item in source[collection] if belongs(item)]
-        local_source['reference_blocks'] = [{**block,'href':f'../{owner[block["id"]]["id"]}/learning.html#src-{block["id"]}'} for block in source['blocks'] if owner[block['id']]['id']!=chapter['id']]
-        local_source['reference_targets'] = [{key:value for key,value in target.items() if key!='chapter'}|{'href':f'../{target["chapter"]["id"]}/learning.html#{target["id"]}'} for target in targets if target['chapter']['id']!=chapter['id']]
+        local_source['reference_blocks'] = [{**block,'href':f'../{owner[block["id"]]["id"]}/learning.{suffix}#src-{block["id"]}'} for block in source['blocks'] if owner[block['id']]['id']!=chapter['id']]
+        local_source['reference_targets'] = [{key:value for key,value in target.items() if key!='chapter'}|{'href':f'../{target["chapter"]["id"]}/learning.{suffix}#{target["id"]}'} for target in targets if target['chapter']['id']!=chapter['id']]
         local_source['document_set_sha256'] = hashlib.sha256((source['document_set_sha256']+chapter['id']).encode()).hexdigest()
         local_learning = copy.deepcopy(learning)
         local_learning['title'] = f'{learning["title"]} · {chapter["title"]}'
@@ -97,21 +104,46 @@ def render_book(source,learning,extraction,config,run_dir,warnings):
                 local_learning['thematic_sections'].append({**section, 'paragraphs': paragraphs, 'source_ids': list(dict.fromkeys(identifier for item in paragraphs for identifier in item['source_ids']))})
         local_extraction = copy.deepcopy(extraction)
         local_extraction['records'] = [record for record in extraction['records'] if any(owner[citation['block_id']]['id']==chapter['id'] for cell in record['values'].values() for citation in cell.get('evidence',[]))]
-        result = render_guide(local_source,local_learning,local_extraction,directory,warnings)
-        file = Path(result['html'])
-        content = file.read_text(encoding='utf-8').replace('<article>','<article><p><a href="../../index.html">← 返回全书目录</a></p>',1)
-        file.write_text(content,encoding='utf-8')
-        markdown_file = Path(result['markdown'])
-        markdown = markdown_file.read_text(encoding='utf-8')
-        for companion in ('fulltext.md','paragraphs.md','source-index.md'):
-            markdown = markdown.replace(f']({companion})', f'](../../{companion})')
-        markdown_file.write_text(markdown,encoding='utf-8')
+        result = render_guide(local_source,local_learning,local_extraction,directory,warnings,formats=formats)
+        if 'html' in result:
+            file = Path(result['html'])
+            content = file.read_text(encoding='utf-8').replace('<article>','<article><p><a href="../../index.html">← 返回全书目录</a></p>',1)
+            file.write_text(content,encoding='utf-8')
+        if 'markdown' in result:
+            markdown_file = Path(result['markdown'])
+            markdown = '[← 返回全书目录](../../index.md)\n\n'+markdown_file.read_text(encoding='utf-8')
+            for companion in ('fulltext.md','paragraphs.md','source-index.md'):
+                markdown = markdown.replace(f']({companion})', f'](../../{companion})')
+            markdown_file.write_text(markdown,encoding='utf-8')
         chapter['artifacts'] = result
         chapter['source_blocks'] = len(local_source['blocks'])
         chapter['explained_blocks'] = len(local_learning['paragraphs'])
-    links = ''.join(f'<li class="card"><a href="{html.escape(chapter["file"])}">{html.escape(chapter["title"])}</a><p class="meta">{html.escape(chapter["document_id"])} · p.{chapter["start_page"]}–{chapter["end_page"]} · {chapter["source_blocks"]} 个来源块</p></li>' for chapter in chapters)
-    index = run_dir/'index.html'
-    index.write_text(f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(learning["title"])} · 全书目录</title><style>{CSS}</style></head><body><main style="display:block;max-width:900px"><p class="eyebrow">PaperShelf / Book</p><h1>{html.escape(learning["title"])}</h1><p>章节覆盖全部 {len(source["pages"])} 页，合计 {len(source["blocks"])} 个来源块。每章都包含来源链接与页图。</p><ol>{links}</ol><p><a href="learning.html">打开完整单文件学习稿</a> · <a href="learning.md">完整 Markdown</a></p></main></body></html>',encoding='utf-8')
+    artifacts = {'book_manifest':str(run_dir/'book.json')}
+    complete_files = {kind:f'learning.{"html" if kind=="html" else "md"}' for kind in formats if (run_dir/f'learning.{"html" if kind=="html" else "md"}').is_file()}
+    if 'html' in formats:
+        links = ''.join(f'<li class="card"><a href="{html.escape(chapter["files"]["html"])}">{html.escape(chapter["title"])}</a><p class="meta">{html.escape(chapter["document_id"])} · p.{chapter["start_page"]}–{chapter["end_page"]} · {chapter["source_blocks"]} 个来源块</p></li>' for chapter in chapters)
+        full_links = ' · '.join(f'<a href="{complete_files[kind]}">{label}</a>' for kind,label in [('html','打开完整单文件学习稿'),('markdown','完整 Markdown')] if kind in complete_files)
+        index = run_dir/'index.html'
+        index.write_text(f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(learning["title"])} · 全书目录</title><style>{CSS}</style></head><body><main style="display:block;max-width:900px"><p class="eyebrow">PaperShelf / Book</p><h1>{html.escape(learning["title"])}</h1><p>章节覆盖全部 {len(source["pages"])} 页，合计 {len(source["blocks"])} 个来源块。每章都包含来源链接与页图。</p><ol>{links}</ol><p>{full_links}</p></main></body></html>',encoding='utf-8')
+        artifacts.update({'html':str(index),'book_index':str(index)})
+        if 'html' in complete_files:
+            artifacts['full_html'] = str(run_dir/complete_files['html'])
+    if 'markdown' in formats:
+        # Escape labels so brackets in chapter titles cannot alter local links.
+        def md_label(text):
+            return str(text).replace('\\','\\\\').replace('[','\\[').replace(']','\\]').replace('\n',' ')
+        lines = [f'# {learning["title"]} · 全书目录','',f'章节覆盖全部 {len(source["pages"])} 页，合计 {len(source["blocks"])} 个来源块。','']
+        for number,chapter in enumerate(chapters,1):
+            lines.extend([f'{number}. [{md_label(chapter["title"])}]({chapter["files"]["markdown"]})',f'   {chapter["document_id"]} · p.{chapter["start_page"]}–{chapter["end_page"]} · {chapter["source_blocks"]} 个来源块',''])
+        lines.append(' · '.join(f'[{label}]({complete_files[kind]})' for kind,label in [('html','完整学习网页'),('markdown','完整 Markdown')] if kind in complete_files))
+        index = run_dir/'index.md'
+        index.write_text('\n'.join(lines)+'\n',encoding='utf-8')
+        artifacts['markdown'] = str(index)
+        artifacts['book_markdown_index'] = str(index)
+        if 'html' not in formats:
+            artifacts['book_index'] = str(index)
+        if 'markdown' in complete_files:
+            artifacts['full_markdown'] = str(run_dir/complete_files['markdown'])
     manifest = {'chapters':chapters,'pages':len(source['pages']),'source_blocks':len(source['blocks']),'coverage':'all_pages_exactly_once'}
     write_json(run_dir/'book.json',manifest)
-    return {'html':str(index),'book_index':str(index),'book_manifest':str(run_dir/'book.json'),'full_html':str(run_dir/'learning.html')}
+    return artifacts
