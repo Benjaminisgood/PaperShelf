@@ -62,4 +62,15 @@ final class LearningModelsTests: XCTestCase {
         let restored = try JSONDecoder().decode(LearningRun.self, from: JSONEncoder().encode(run))
         XCTAssertEqual(restored.revisionOf, run.revisionOf)
     }
+    func testSourceReviewedEditionHasDistinctHistoryLabel() throws {
+        let data = Data("""
+        {"run_id":"review","reference_id":"paper","status":"completed","mode":"llm","revision_of":"/ai/manifest.json","revision_kind":"source_reviewed_revision"}
+        """.utf8)
+        var run = try XCTUnwrap(LearningRun.recover(manifest: data, directory: URL(fileURLWithPath: "/review")))
+        XCTAssertEqual(run.statusLabel, "原页校核版")
+        let restored = try JSONDecoder().decode(LearningRun.self, from: JSONEncoder().encode(run))
+        XCTAssertEqual(restored.revisionKind, "source_reviewed_revision")
+        run.status = "failed"
+        XCTAssertEqual(run.statusLabel, "失败")
+    }
 }

@@ -88,6 +88,15 @@ python -m papershelf_pipeline revise --manifest /absolute/run/manifest.json
 
 校订独立执行完整原语言重排与逐句中文直译，再对照 canonical 原文重新组织主题。原句中的变量定义、数值、条件和论断强度必须保留；英文明确断词如 `challen-ging` 可以修复，数学符号疑点必须记录。正文中的重复页眉、版权和仓储封面保留在来源索引，独立公式和图轴保留在版面附录。旧版本不覆盖，自定义字段及其证据不经生成模型改写。旧译述和整理稿保存在新版本 `draft/`，校订前后稿及每次模型响应可追溯。源文件改变时拒绝混用版本；失败或取消保留状态与已完成响应。
 
+已对照原页核实的文字、译文或公式可在完整校订版上另存，无需再次调用模型：
+
+```sh
+python -m papershelf_pipeline revise --manifest /absolute/run/manifest.json \
+  --editorial-only --editorial-corrections /absolute/source-reviewed-corrections.json
+```
+
+校核包绑定原文 SHA256、来源 ID 和原页图 SHA256。`content_corrections` 必须提供字段完整原值、新值及理由；`clean_reading` 修正还需 `reading_group_id`。完整译文有逐句单元时，`required_follow_through` 必须同时提供 `translation_units_original` / `translation_units_corrected`，保留全部单元 ID 和顺序，新单元连接后须等于新译文。编辑说明可同样提供 `editing_notes_original` / `editing_notes_corrected`。精确值不匹配时另存失败，不覆盖原版本；历史约束不应冒充本次精确替换。新版本保留修订前稿、实际应用位置和关联译文，重新生成 HTML、Markdown 与 Agent，并记录零模型调用。原始提取字形如 `2` 经原页确认改为 `∈` 后，数值校验标记为来源核验修订，同时保留原校验记录；这不代表用户已接受科学内容。
+
 `--provider-config` 可选择无密钥的当前服务配置。`--editorial-corrections` 可提供独立核验记录：绑定原 PDF SHA256、来源 ID、实际页图 SHA256、审阅者和核验方法；公式修正保留前后值，正文修正只匹配精确旧值。核验过的公式按原文位置重新进入全文 MD，未可靠重建的公式保留原始证据，不以乱码冒充可读 LaTeX。新版本的 Graphiti/Paper2Agent 回执仍明确引用之前的独立任务，不隐式重写远端知识库或重复执行科学工具。
 
 复核后可在请求提供 `review_corrections_path`（精确原值/新值/原因/来源 ID）和 `layout_observations_path`（原 PDF SHA256/来源 ID/原版面观察/核验记录）。前者修改讲解文字、逐句译述或公式及符号解释，保存 `chunks/*-before-review.json` 与 `learning-review.json`；后者把经独立核验的提取误差或原文冲突显式提供给生成器。字段事实使用独立的 `extraction_corrections_path`：每项须有 paper、source_sha256、record_id、field、完整 original/corrected 单元格、reason、actor；源文件及原值匹配后再次严格核验类型与逐字引文/页码，并通过既有数据集审阅机制保留哈希审计链。它在所有导出和 Agent 生成前应用，保存 `extraction-before-review.json`、`extraction-review.json`，明确不代表研究者科学验收。旧运行不会被覆写，未核验图像不得被称作已阅读。

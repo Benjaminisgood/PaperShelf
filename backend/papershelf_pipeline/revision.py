@@ -46,10 +46,10 @@ def _metrics(source, learning, extraction, provider):
             'clean_reading_groups': len(learning.get('clean_reading', [])),
             'thematic_sections': len(learning.get('thematic_sections', [])),
             'figure_candidates': len(source.get('figure_inventory', [])),
-            'provider_calls': provider.calls, 'provider_usage': dict(provider.usage)}
+            'provider_calls': provider.calls if provider else 0, 'provider_usage': dict(provider.usage) if provider else {}}
 
 
-def revise(manifest_path, provider_config=None, progress=None, editorial_corrections_path=None):
+def revise(manifest_path, provider_config=None, progress=None, editorial_corrections_path=None, *, editorial_only=False):
     from .pipeline import create_agent, progress as default_progress, update_index
     from .provider import Provider
     from .reading import apply_reading_layer
@@ -59,6 +59,8 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
     from .dataset import export_dataset, validate_extraction
 
     progress = progress or default_progress
+    if editorial_only and editorial_corrections_path is None:
+        raise PipelineError('只应用审校修订时必须明确提供来源绑定的校订证据。')
     original_path = Path(manifest_path).expanduser().resolve()
     original = read_json(original_path)
     if original.get('status') not in {'completed', 'partial'}:
@@ -68,7 +70,10 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
         if not (previous / name).is_file():
             raise PipelineError(f'原版本缺少 {name}；请先完成或恢复原任务。')
     request = read_json(previous / 'request.json')
-    request.update(mode='llm', revision_of=str(original_path))
+    request.update(revision_of=str(original_path))
+    if not editorial_only:
+        request['mode'] = 'llm'
+    request['editorial_only'] = editorial_only
     for key in ('resume_from', 'review_corrections_path', 'extraction_corrections_path', 'summary_corrections_path',
                 'paragraph_corrections_path', 'editorial_corrections_path'):
         request.pop(key, None)
@@ -79,7 +84,7 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
     documents = [{'id': 'main', 'path': request['source_path'], 'sha256': original_source['sha256']}]
     documents.extend(document for document in original_source.get('documents', []) if document['path'] != request['source_path'])
     _check_documents(documents)
-    provider = Provider(request.get('provider', {}))
+    provider = None if editorial_only else Provider(request.get('provider', {}))
     root = Path(request['output_root'])
     if root == previous or previous in root.parents:
         raise PipelineError('校订输出根目录不能位于原版本内。')
@@ -92,7 +97,8 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
     path = directory / 'manifest.json'
     receipt = {**original, 'run_id': identifier, 'created_at': dt.datetime.now(dt.timezone.utc).isoformat(),
                'run_dir': str(directory), 'manifest_path': str(path), 'revision_of': str(original_path),
-               'revision_kind': 'ai_editorial_revision', 'mode': 'llm', 'quality': 'generated_unreviewed',
+               'revision_kind': 'source_reviewed_revision' if editorial_only else 'ai_editorial_revision',
+               'mode': request['mode'], 'quality': 'generated_unreviewed',
                'status': 'running', 'artifacts': {}, 'metrics': {}, 'warnings': list(original.get('warnings', [])),
                'extraction_reused': True}
     for key in ('error', 'finished_at', 'artifact_sha256', 'integration_errors', 'graphiti', 'paper2agent',
@@ -156,15 +162,26 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
                     return str(target)
             return value
 
-        source = apply_reading_layer(relocate(copy.deepcopy(original_source)))
+        source = relocate(copy.deepcopy(original_source))
+        if not editorial_only:
+            source = apply_reading_layer(source)
         learning = relocate(copy.deepcopy(read_json(previous / 'learning.json')))
         extraction = relocate(copy.deepcopy(read_json(previous / 'extraction.json')))
-        if learning.get('mode') != 'llm':
+        if editorial_only:
+            from .synthesis import reading_groups
+            groups = reading_groups(source)
+            clean = learning.get('clean_reading', [])
+            if not groups or [item.get('id') for item in clean] != [group['id'] for group in groups]:
+                raise PipelineError('只应用审校修订需要已有完整、对应当前来源阅读组的正文。')
+            if any(item.get('source_ids') != group['source_ids'] for item, group in zip(clean, groups)):
+                raise PipelineError('只应用审校修订不能改变正文与原文的来源映射。')
+        elif learning.get('mode') != 'llm':
             learning['overview'] = '本版已根据完整来源生成原语言校订与中文译述，内容仍需结合原文核验。自定义字段沿用原版本，没有在校订时重新提取。'
             old_notes = [note for note in learning.get('gaps', []) if isinstance(note, str) and note.startswith('未调用模型')]
             learning.setdefault('process_notes', []).extend(old_notes)
             learning['gaps'] = [note for note in learning.get('gaps', []) if note not in old_notes]
-        learning['mode'] = 'llm'
+        if not editorial_only:
+            learning['mode'] = 'llm'
         learning['reading_coverage'] = _coverage(source)
         request['source_path'] = copied[str(Path(request['source_path']).resolve())]
         request['supplementary_paths'] = [copied[str(Path(item).resolve())] for item in request.get('supplementary_paths', [])]
@@ -253,15 +270,19 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
         write_json(directory / 'source.json', source)
         receipt['metrics'] = _metrics(source, learning, extraction, provider)
         write_json(path, receipt)
-        progress('对照完整原文，校订英文正文与中文译述')
-        polish_reading(source, learning, provider, directory, progress)
-        write_json(directory / 'learning.json', learning)
+        if editorial_only:
+            progress('应用原页核验修订并另存版本')
+        else:
+            progress('对照完整原文，校订英文正文与中文译述')
+            polish_reading(source, learning, provider, directory, progress)
+            write_json(directory / 'learning.json', learning)
         artifacts['learning'] = str(directory / 'learning.json')
-        progress('对照原文重新整理中文主题、限定条件和学习条目')
-        consolidate_learning(learning, source, provider, directory, progress)
+        if not editorial_only:
+            progress('对照原文重新整理中文主题、限定条件和学习条目')
+            consolidate_learning(learning, source, provider, directory, progress)
         if bundle is not None:
             from .editorial_review import apply_editorial_review
-            artifacts.update(apply_editorial_review(learning, source, bundle, directory))
+            artifacts.update(apply_editorial_review(learning, source, bundle, directory, require_exact=editorial_only))
         separate_process_notes(learning)
         learning['reading_coverage'] = _coverage(source)
         warnings = receipt['warnings']
@@ -316,7 +337,7 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
     except Exception as error:
         receipt.update(status='cancelled' if cancellation_requested or isinstance(error, PipelineCancelled) else 'failed',
                        error=str(error), finished_at=dt.datetime.now(dt.timezone.utc).isoformat())
-        receipt['metrics'].update(provider_calls=provider.calls, provider_usage=dict(provider.usage))
+        receipt['metrics'].update(provider_calls=provider.calls if provider else 0, provider_usage=dict(provider.usage) if provider else {})
         write_json(path, receipt)
         update_index(root, receipt)
         error_type = PipelineCancelled if receipt['status'] == 'cancelled' else PipelineError

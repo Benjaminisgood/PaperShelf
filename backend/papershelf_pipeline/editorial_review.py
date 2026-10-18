@@ -74,6 +74,19 @@ def load_editorial_review(path, source):
             elif section == 'content_corrections':
                 if any(not isinstance(item.get(key), str) or not item[key] for key in ('section', 'field', 'original', 'corrected', 'why')):
                     raise PipelineError('正文修正须提供原值、新值及原因。')
+                if item['section'] == 'clean_reading' and (item['field'] not in {'text', 'translation'} or not isinstance(item.get('reading_group_id'), str)):
+                    raise PipelineError('阅读正文修订须指定reading_group_id及text或translation。')
+                follow = item.get('required_follow_through', {})
+                if not isinstance(follow, dict):
+                    raise PipelineError('阅读修订的关联更新必须为对象。')
+                for field in ('translation_units', 'editing_notes'):
+                    keys = (field + '_original', field + '_corrected')
+                    if any(key in follow for key in keys) and not all(isinstance(follow.get(key), list) for key in keys):
+                        raise PipelineError('阅读修订的关联更新须同时提供完整原值和新值。')
+                for quote in item.get('source_evidence', []):
+                    block = blocks.get(quote.get('block_id')) if isinstance(quote, dict) else None
+                    if not block or block['id'] not in ids or quote.get('page') != block['page'] or not isinstance(quote.get('quote'), str) or not quote['quote'] or quote['quote'] not in block['text']:
+                        raise PipelineError('正文修订的逐字来源证据不匹配。')
             elif section == 'reading_notes':
                 if not isinstance(item.get('text'), str) or not item['text'].strip():
                     raise PipelineError('正文校核说明为空。')
@@ -82,7 +95,58 @@ def load_editorial_review(path, source):
     return bundle
 
 
-def apply_editorial_review(learning, source, bundle, directory):
+def _synchronize_reading_correction(item, correction, learning, bundle):
+    follow = correction.get('required_follow_through', {})
+    units = item.get('translation_units', [])
+    if correction['field'] == 'translation' and units and 'translation_units_corrected' not in follow:
+        raise PipelineError('完整译文修订必须同时核对逐句translation_units，不能留下相互矛盾的译文。')
+    for field in ('translation_units', 'editing_notes'):
+        if field + '_corrected' not in follow:
+            continue
+        original, corrected = follow[field + '_original'], follow[field + '_corrected']
+        if item.get(field, []) not in (original, corrected):
+            raise PipelineError(f'阅读修订的{field}原值不匹配，不能覆盖新变化。')
+        if field == 'translation_units':
+            if any(not isinstance(unit, dict) for unit in original + corrected) or [unit.get('unit_id') for unit in original] != [unit.get('unit_id') for unit in corrected]:
+                raise PipelineError('审校不可增加、删除或重排翻译单元ID。')
+            if any(not isinstance(unit.get('translation'), str) or not unit['translation'].strip() for unit in corrected):
+                raise PipelineError('审校后的逐句译文不能为空。')
+            if corrected and '\n\n'.join(unit['translation'].strip() for unit in corrected) != item['translation']:
+                raise PipelineError('审校后的逐句译文与完整译文不一致。')
+        elif any(not isinstance(note, str) for note in corrected):
+            raise PipelineError('审校后的编辑说明必须为文字数组。')
+        item[field] = copy.deepcopy(corrected)
+    item.setdefault('validation_before_editorial_review', copy.deepcopy(item.get('translation_validation', {})))
+    item['translation_validation'] = {**item.get('translation_validation', {}),
+                                      'numeric_tokens': 'source_reviewed_correction',
+                                      'semantic_review': 'source_reviewed_correction_not_human_acceptance'}
+    if correction['field'] == 'text':
+        item.setdefault('reading_validation_before_editorial_review', copy.deepcopy(item.get('validation', {})))
+        item['validation'] = {**item.get('validation', {}), 'numeric_tokens': 'source_reviewed_correction',
+                              'units': 'source_reviewed_correction', 'inline_markers': 'source_reviewed_correction',
+                              'semantic_review': 'source_reviewed_correction_not_human_acceptance'}
+    item['status'] = 'source_reviewed_correction'
+    item.setdefault('editing_notes', [])
+    if 'editing_notes_corrected' not in follow:
+        note = '原页核对修订：' + correction['why']
+        if note not in item['editing_notes']:
+            item['editing_notes'].append(note)
+    marker = {'id': correction.get('id'), 'field': correction['field'], 'reviewer': bundle['reviewer'],
+              'source_sha256': bundle['source_sha256'], 'verification': copy.deepcopy(correction['verification']),
+              'human_scientific_acceptance': False}
+    if marker not in item.setdefault('source_reviewed_corrections', []):
+        item['source_reviewed_corrections'].append(marker)
+    for paragraph in learning.get('paragraphs', []):
+        if paragraph.get('source_id') != item['id']:
+            continue
+        if set(paragraph.get('source_ids', [paragraph['source_id']])) != set(item['source_ids']):
+            raise PipelineError('阅读正文与逐段译述来源映射不一致，不能应用审校修订。')
+        paragraph['explanation'] = item['translation']
+        paragraph['translation_units'] = copy.deepcopy(item.get('translation_units', []))
+        paragraph['translation_validation'] = copy.deepcopy(item['translation_validation'])
+
+
+def apply_editorial_review(learning, source, bundle, directory, *, require_exact=False):
     sources = {item['id']: item for item in source['blocks']}
     before = copy.deepcopy(learning)
     records = []
@@ -117,13 +181,25 @@ def apply_editorial_review(learning, source, bundle, directory):
         return min((positions[i] for i in equation.get('source_ids', []) if i in positions), default=len(positions)), label_order
     equations.sort(key=reading_order)
     for correction in bundle.get('content_corrections', []):
-        locations = []
+        locations, already = [], []
         for prefix, sections in (('', learning), ('consolidated.', learning.get('consolidated', {}))):
             for index, item in enumerate(sections.get(correction['section'], [])):
-                if isinstance(item, dict) and item.get(correction['field']) == correction['original'] and set(item.get('source_ids', [])) == set(correction['source_ids']):
-                    item[correction['field']] = correction['corrected']
-                    locations.append(f'{prefix}{correction["section"]}[{index}].{correction["field"]}')
-        records.append({**correction, 'status': 'applied_exact_match' if locations else 'retained_as_grounding_constraint', 'matches': len(locations), 'locations': locations})
+                if not isinstance(item, dict) or set(item.get('source_ids', [])) != set(correction['source_ids']):
+                    continue
+                if correction['section'] == 'clean_reading' and item.get('id') != correction.get('reading_group_id'):
+                    continue
+                value = item.get(correction['field'])
+                if value not in (correction['original'], correction['corrected']):
+                    continue
+                location = f'{prefix}{correction["section"]}[{index}].{correction["field"]}'
+                (locations if value == correction['original'] else already).append(location)
+                item[correction['field']] = correction['corrected']
+                if correction['section'] == 'clean_reading':
+                    _synchronize_reading_correction(item, correction, learning, bundle)
+        if require_exact and not locations and not already:
+            raise PipelineError(f'审校修订{correction.get("id", correction["section"])}未匹配任何原值或已修订值；已停止另存，原版本保持不变。')
+        records.append({**correction, 'status': 'applied_exact_match' if locations else ('already_applied' if already else 'retained_as_grounding_constraint'),
+                        'matches': len(locations), 'locations': locations, 'already_applied_locations': already})
     # Scientific caveats belong beside the affected passage as well as in the
     # equation cards. These are verified annotations, never replacement prose.
     for entry in bundle.get('reading_notes', []):

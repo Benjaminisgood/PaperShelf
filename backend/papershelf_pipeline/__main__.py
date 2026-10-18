@@ -19,6 +19,7 @@ def main():
     revision.add_argument('--manifest', required=True)
     revision.add_argument('--provider-config', help='Optional current provider configuration without credentials')
     revision.add_argument('--editorial-corrections', help='Optional source and page-image SHA-bound editorial review bundle')
+    revision.add_argument('--editorial-only', action='store_true', help='Apply exact source-reviewed corrections in a new version without model calls; requires --editorial-corrections')
     agent = subparsers.add_parser('agent',help='Search or ask a generated paper agent; optionally serve MCP')
     agent.add_argument('--manifest',required=True)
     agent.add_argument('--query')
@@ -48,7 +49,7 @@ def main():
                 from .revision import revise
                 config = read_json(args.provider_config) if args.provider_config else None
                 if config is not None: config = config.get('provider', config)
-                result = revise(args.manifest, config, editorial_corrections_path=args.editorial_corrections)
+                result = revise(args.manifest, config, editorial_corrections_path=args.editorial_corrections, editorial_only=args.editorial_only)
             elif args.command == 'agent':
                 if not args.query:
                     raise PipelineError('请提供 --query 或 --stdio。')

@@ -10,6 +10,69 @@ from papershelf_pipeline.reading_editions import render_reading_editions
 
 
 class EditorialReviewTests(unittest.TestCase):
+    def reading_fixture(self):
+        source = {'sha256': 'hash', 'blocks': [{'id': 'a', 'page': 1, 'text': 'W 2 R.'}]}
+        units = [{'unit_id': 'a:u1', 'translation': 'W 2 R。'}]
+        item = {'id': 'a', 'source_ids': ['a'], 'text': 'W 2 R.', 'translation': 'W 2 R。',
+                'translation_units': units, 'editing_notes': ['Retained extracted glyph.'],
+                'validation': {'numeric_tokens': 'identical', 'units': 'identical', 'source_mapping': 'complete'},
+                'translation_validation': {'numeric_tokens': 'identical', 'sentence_units': 'complete'}}
+        learning = {'clean_reading': [item], 'paragraphs': [{'source_id': 'a', 'source_ids': ['a'], 'explanation': 'W 2 R。'}]}
+        corrections = []
+        for field, corrected in [('text', 'W ∈ R.'), ('translation', 'W ∈ R。')]:
+            follow = {'editing_notes_original': item['editing_notes'], 'editing_notes_corrected': ['Membership glyph verified against source page.']}
+            if field == 'translation':
+                follow.update(translation_units_original=units, translation_units_corrected=[{'unit_id': 'a:u1', 'translation': corrected}])
+            corrections.append({'id': 'review-' + field, 'section': 'clean_reading', 'reading_group_id': 'a',
+                                'field': field, 'original': item[field], 'corrected': corrected, 'source_ids': ['a'],
+                                'why': 'Membership symbol, not a numerical value.', 'verification': {},
+                                'required_follow_through': follow})
+        return source, learning, {'reviewer': 'fixture', 'source_sha256': 'hash', 'content_corrections': corrections}
+
+    def test_reading_revision_synchronizes_translation_and_preserves_validation_provenance(self):
+        source, learning, bundle = self.reading_fixture()
+        before = copy.deepcopy(learning)
+        with tempfile.TemporaryDirectory() as name:
+            outputs = apply_editorial_review(learning, source, bundle, Path(name), require_exact=True)
+            self.assertEqual(read_json(outputs['editorial_review_draft']), before)
+            item = learning['clean_reading'][0]
+            self.assertEqual(item['text'], 'W ∈ R.')
+            self.assertEqual(item['translation'], 'W ∈ R。')
+            self.assertEqual(item['translation_units'], [{'unit_id': 'a:u1', 'translation': 'W ∈ R。'}])
+            self.assertEqual(item['validation_before_editorial_review']['numeric_tokens'], 'identical')
+            self.assertEqual(item['translation_validation']['numeric_tokens'], 'source_reviewed_correction')
+            self.assertEqual(item['reading_validation_before_editorial_review']['numeric_tokens'], 'identical')
+            self.assertEqual(item['validation']['inline_markers'], 'source_reviewed_correction')
+            self.assertEqual(item['validation']['source_mapping'], 'complete')
+            self.assertEqual(learning['paragraphs'][0]['explanation'], item['translation'])
+            self.assertEqual(learning['paragraphs'][0]['translation_units'], item['translation_units'])
+            self.assertEqual(learning['paragraphs'][0]['translation_validation'], item['translation_validation'])
+            self.assertTrue(all(not mark['human_scientific_acceptance'] for mark in item['source_reviewed_corrections']))
+            # Exact replay is idempotent, including note and sentence metadata.
+            repeat = copy.deepcopy(item)
+            apply_editorial_review(learning, source, bundle, Path(name), require_exact=True)
+            self.assertEqual(learning['clean_reading'][0], repeat)
+            self.assertTrue(all(record['status'] == 'already_applied' for record in learning['editorial_review']['records']))
+            self.assertEqual(source['blocks'][0]['text'], 'W 2 R.')
+
+    def test_reading_revision_rejects_stale_values_or_inconsistent_sentence_units(self):
+        for fault, expected in [('original', '未匹配'), ('missing_units', 'translation_units'),
+                                ('unit_id', '单元ID'), ('translation', '不一致'), ('stale_units', '原值不匹配')]:
+            source, learning, bundle = self.reading_fixture()
+            correction = bundle['content_corrections'][1]
+            if fault == 'original':
+                correction['original'] = 'unrelated draft'
+            elif fault == 'missing_units':
+                correction['required_follow_through'].pop('translation_units_corrected')
+            elif fault == 'unit_id':
+                correction['required_follow_through']['translation_units_corrected'][0]['unit_id'] = 'invented'
+            elif fault == 'translation':
+                correction['corrected'] = 'different translation'
+            else:
+                learning['clean_reading'][0]['translation_units'] = [{'unit_id': 'a:u1', 'translation': 'changed draft'}]
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as name, self.assertRaisesRegex(PipelineError, expected):
+                apply_editorial_review(learning, source, bundle, Path(name), require_exact=True)
+
     def test_source_bound_caveat_is_visible_beside_original_and_translation_without_rewriting(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)

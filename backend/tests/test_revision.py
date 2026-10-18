@@ -265,6 +265,60 @@ class RevisionTests(unittest.TestCase):
         with patch('papershelf_pipeline.provider.Provider', EditingProvider), self.assertRaisesRegex(PipelineError, '页图'):
             revise(repeated['manifest_path'], progress=lambda message: None)
 
+    def test_editorial_only_creates_portable_exact_revision_without_provider_or_reprojection(self):
+        parent = self.perform()
+        directory = Path(parent['run_dir'])
+        before = {str(p.relative_to(directory)): sha256(p) for p in directory.rglob('*') if p.is_file()}
+        source = read_json(parent['artifacts']['source'])
+        item = read_json(parent['artifacts']['learning'])['clean_reading'][0]
+        corrected = item['translation'].replace('完整直译：', '核对译文：')
+        units = [{**u, 'translation': u['translation'].replace('完整直译：', '核对译文：')} for u in item['translation_units']]
+        review = self.root / 'exact-review.json'
+        write_json(review, {'source_sha256': source['sha256'], 'reviewer': 'fixture', 'content_corrections': [
+            {'id': 'verified-translation', 'section': 'clean_reading', 'reading_group_id': item['id'], 'field': 'translation',
+             'source_ids': item['source_ids'], 'original': item['translation'], 'corrected': corrected, 'why': 'Fixture source review',
+             'required_follow_through': {'translation_units_original': item['translation_units'], 'translation_units_corrected': units},
+             'verification': {'pages': [1], 'page_image_sha256': {'1': sha256(source['figures'][0]['path'])}, 'method': 'fixture page inspection'}}]})
+        with patch('papershelf_pipeline.provider.Provider', side_effect=AssertionError('No provider allowed')), \
+             patch('papershelf_pipeline.reading.apply_reading_layer', side_effect=AssertionError('No regrouping allowed')), \
+             patch('papershelf_pipeline.synthesis.consolidate_learning', side_effect=AssertionError('No synthesis allowed')):
+            result = revise(parent['manifest_path'], editorial_corrections_path=review, editorial_only=True, progress=lambda _: None)
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(result['revision_kind'], 'source_reviewed_revision')
+        self.assertEqual(result['metrics']['provider_calls'], 0)
+        self.assertEqual(result['metrics']['provider_usage'], {})
+        self.assertEqual(read_json(result['artifacts']['source'])['blocks'], source['blocks'])
+        self.assertEqual(read_json(result['artifacts']['source'])['reading_main_blocks'], source['reading_main_blocks'])
+        edited = read_json(result['artifacts']['learning'])
+        self.assertEqual(edited['clean_reading'][0]['translation'], corrected)
+        self.assertEqual(edited['paragraphs'][0]['explanation'], corrected)
+        for key in ('html', 'markdown', 'paragraph_markdown'):
+            self.assertIn('核对译文', Path(result['artifacts'][key]).read_text())
+        for key, path in result['artifacts'].items():
+            self.assertEqual(result['artifact_sha256'][key], sha256(path))
+            self.assertTrue(Path(path).is_relative_to(result['run_dir']))
+        self.assertEqual(before, {str(p.relative_to(directory)): sha256(p) for p in directory.rglob('*') if p.is_file()})
+        self.assertEqual(self.snapshot_run(), self.snapshot)
+        # Strict mismatches create a failed new receipt, never change the parent.
+        bundle = read_json(review)
+        bundle['content_corrections'][0]['original'] = 'stale translation'
+        write_json(review, bundle)
+        with patch('papershelf_pipeline.provider.Provider', side_effect=AssertionError('No provider allowed')), self.assertRaisesRegex(PipelineError, '未匹配'):
+            revise(parent['manifest_path'], editorial_corrections_path=review, editorial_only=True, progress=lambda _: None)
+        self.assertEqual(before, {str(p.relative_to(directory)): sha256(p) for p in directory.rglob('*') if p.is_file()})
+
+    def test_editorial_only_requires_explicit_review_and_complete_existing_reading(self):
+        with patch('papershelf_pipeline.provider.Provider') as provider:
+            with self.assertRaisesRegex(PipelineError, '明确提供'):
+                revise(self.previous / 'manifest.json', editorial_only=True)
+            self.assertFalse(self.revisions())
+            review = self.root / 'review.json'
+            write_json(review, {})
+            with self.assertRaisesRegex(PipelineError, '已有完整'):
+                revise(self.previous / 'manifest.json', editorial_only=True, editorial_corrections_path=review)
+            provider.assert_not_called()
+        self.assertEqual(self.snapshot_run(), self.snapshot)
+
 
 if __name__ == '__main__':
     unittest.main()
