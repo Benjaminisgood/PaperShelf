@@ -1,0 +1,2193 @@
+{
+  "schema_version": "papershelf-formula-review-v1",
+  "paper": "bcrnn",
+  "source_path": "/Users/ben/Desktop/PaperShelf/Examples/d2cp05083h.pdf",
+  "source_sha256": "2524f3f4f81d8288c6b18008c9719cab4c53dd839dad40a9603ff90b5823b546",
+  "reviewer": "Codex independent source-page formula review, 2026-10-18",
+  "reference_run": "20261017T222206Z-cd088fc38f",
+  "reviewed_run": "20261018T053529Z-70f5cfb003",
+  "human_scientific_acceptance": false,
+  "review_method": "直接逐页目视复核当前PDF的完整原页图，并对照canonical来源文本及已有来源绑定layout observations；旧版公式仅作比较。B-CRNN页4另以Poppler 200 dpi复核，页9式24另以200 dpi局部复核。未把模型输出、技术测试或旧表直接视为科学验收。",
+  "equations": [
+    {
+      "id": "bcrnn-eq-1",
+      "equation": {
+        "label": "Eq. 1",
+        "latex": "v_A A + v_B B \\rightarrow v_C C + v_D D",
+        "meaning": "涉及四种物质的基元反应方程式。原始PDF版面在反应物与产物之间使用向右反应箭头；提取文本中的减号是文本层符号映射问题，不是论文原式使用减号。",
+        "symbols": [
+          {
+            "symbol": "v_A, v_B, v_C, v_D",
+            "meaning": "物质A, B, C, D的化学计量系数"
+          }
+        ],
+        "source_ids": [
+          "p3-g41",
+          "p3-g42"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p3-g41",
+        "p3-g42"
+      ],
+      "replace_labels": [
+        "1",
+        "Eqn (1) [Text Layer Artifact]"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-2",
+      "equation": {
+        "label": "Eq. 2",
+        "latex": "\\begin{array}{l}r=k[A]^{v_A}[B]^{v_B}[C]^0[D]^0\\\\=\\exp(\\ln k+v_A\\ln[A]+v_B\\ln[B]+0\\ln[C]+0\\ln[D])\\end{array}",
+        "meaning": "基于质量作用定律的反应速率表达式。",
+        "symbols": [
+          {
+            "symbol": "r",
+            "meaning": "基元反应速率。"
+          },
+          {
+            "symbol": "k",
+            "meaning": "速率常数。"
+          },
+          {
+            "symbol": "[A],[B],[C],[D]",
+            "meaning": "物种浓度。"
+          },
+          {
+            "symbol": "v_A,v_B",
+            "meaning": "该基元反应的反应物化学计量系数/质量作用定律指数。"
+          }
+        ],
+        "source_ids": [
+          "p3-g41",
+          "p3-g44",
+          "p3-g45",
+          "p3-g46",
+          "p3-g47",
+          "p3-g48",
+          "p3-g49"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p3-g41",
+        "p3-g44",
+        "p3-g45",
+        "p3-g46",
+        "p3-g47",
+        "p3-g48",
+        "p3-g49"
+      ],
+      "replace_labels": [
+        "2",
+        "2 (log form)"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-3",
+      "equation": {
+        "label": "Eq. 3",
+        "latex": "[\\dot{[A]},\\dot{[B]},\\dot{[C]},\\dot{[D]}]=[-v_A r,-v_B r,v_C r,v_D r]",
+        "meaning": "各物种浓度随时间的变化率（生成速率）与反应速率的关系。",
+        "symbols": [
+          {
+            "symbol": "\\dot{[X]}",
+            "meaning": "物种X浓度对时间的导数。"
+          },
+          {
+            "symbol": "v_A,v_B,v_C,v_D",
+            "meaning": "该步的化学计量系数。"
+          },
+          {
+            "symbol": "r",
+            "meaning": "该步反应速率。"
+          }
+        ],
+        "source_ids": [
+          "p3-g41",
+          "p3-g49",
+          "p3-g50",
+          "p3-g51"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p3-g41",
+        "p3-g49",
+        "p3-g50",
+        "p3-g51"
+      ],
+      "replace_labels": [
+        "3"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-4",
+      "equation": {
+        "label": "Eq. 4",
+        "latex": "\\begin{array}{l}k=AT^b\\exp(-E_a/(RT))\\\\\\ln k=\\ln A+b\\ln T-E_a/(RT)\\end{array}",
+        "meaning": "修正的阿伦尼乌斯定律，包含温度指数项 b。",
+        "symbols": [
+          {
+            "symbol": "k",
+            "meaning": "速率常数。"
+          },
+          {
+            "symbol": "A",
+            "meaning": "指前因子。"
+          },
+          {
+            "symbol": "T",
+            "meaning": "温度。"
+          },
+          {
+            "symbol": "b",
+            "meaning": "温度依赖拟合参数。"
+          },
+          {
+            "symbol": "E_a",
+            "meaning": "活化能。"
+          },
+          {
+            "symbol": "R",
+            "meaning": "气体常数，须与能量单位匹配。"
+          }
+        ],
+        "source_ids": [
+          "p3-g54",
+          "p3-g55",
+          "p3-g56",
+          "p3-g57",
+          "p3-g58",
+          "p3-g59",
+          "p3-g60",
+          "p3-g61",
+          "p3-g62",
+          "p3-g63"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p3-g54",
+        "p3-g55",
+        "p3-g56",
+        "p3-g57",
+        "p3-g58",
+        "p3-g59",
+        "p3-g60",
+        "p3-g61",
+        "p3-g62",
+        "p3-g63"
+      ],
+      "replace_labels": [
+        "4",
+        "4 (log form)"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-5",
+      "equation": {
+        "label": "Eq. 5",
+        "latex": "\\begin{array}{l}W_{in}=\\operatorname{clamp}(-W,0)\\\\W_{out}=W\\\\\\mathbf r=\\exp(\\ln\\mathbf k+W_{in}^{T}\\cdot\\ln\\mathbf Y)\\\\\\dot{\\mathbf Y}=W_{out}\\cdot\\mathbf r\\end{array}",
+        "meaning": "多反应系统中，输入权重 Win 由 clamp(-W, 0) 提取反应物对应的非负系数；输出权重 Wout = W 保留净化学计量信息，包括反应物的负项与产物的正项，用于得到各物种的净生成速率。",
+        "symbols": [
+          {
+            "symbol": "W",
+            "meaning": "Ns×Nr净化学计量矩阵；负项为反应物，正项为产物。"
+          },
+          {
+            "symbol": "W_in",
+            "meaning": "clamp(-W,0)提取非负反应物权重；T为转置。"
+          },
+          {
+            "symbol": "W_out",
+            "meaning": "等于W，必须保留正负净计量，不能改为仅正产物权重。"
+          },
+          {
+            "symbol": "r,k,Y",
+            "meaning": "反应速率、速率常数与浓度向量；指数与对数逐元素计算。"
+          },
+          {
+            "symbol": "\\dot Y",
+            "meaning": "浓度时间导数，即净生成速率。"
+          }
+        ],
+        "source_ids": [
+          "p3-g65",
+          "p3-g66",
+          "p3-g67",
+          "p3-g68",
+          "p3-g69",
+          "p3-g70",
+          "p3-g71"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p3-g65",
+        "p3-g66",
+        "p3-g67",
+        "p3-g68",
+        "p3-g69",
+        "p3-g70",
+        "p3-g71"
+      ],
+      "replace_labels": [
+        "5",
+        "Eq. 5 (implied from context p3-g70/p3-g71)",
+        "Eqn (5) Components"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-6",
+      "equation": {
+        "label": "Eq. 6",
+        "latex": "\\dot{Y}(t) = \\text{CRNN}(Y(t))",
+        "meaning": "使用CRNN模型根据当前浓度估计浓度变化率。",
+        "symbols": [
+          {
+            "symbol": "\\dot{Y}(t)",
+            "meaning": "时间t时的浓度变化率"
+          },
+          {
+            "symbol": "Y(t)",
+            "meaning": "时间t时的物种浓度向量"
+          },
+          {
+            "symbol": "\\text{CRNN}",
+            "meaning": "化学反应神经网络函数"
+          }
+        ],
+        "source_ids": [
+          "p3-g71",
+          "p3-g72",
+          "p3-g73"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p3-g71",
+        "p3-g72",
+        "p3-g73"
+      ],
+      "replace_labels": [
+        "Eq. 6"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-7",
+      "equation": {
+        "label": "Eq. 7",
+        "latex": "p(\\theta\\mid D)=\\frac{p(D\\mid\\theta)p(\\theta)}{p(D)}",
+        "meaning": "贝叶斯定理：由似然、先验及证据归一化项得到参数θ的后验分布。",
+        "symbols": [
+          {
+            "symbol": "\\theta",
+            "meaning": "CRNN可优化参数向量"
+          },
+          {
+            "symbol": "D",
+            "meaning": "训练数据集"
+          },
+          {
+            "symbol": "p(D\\mid\\theta)",
+            "meaning": "似然函数"
+          },
+          {
+            "symbol": "p(\\theta)",
+            "meaning": "先验分布"
+          },
+          {
+            "symbol": "p(D)",
+            "meaning": "证据，即对参数积分后的数据边缘概率"
+          }
+        ],
+        "source_ids": [
+          "p4-g85",
+          "p4-g86",
+          "p4-g87",
+          "p4-g88",
+          "p4-g89",
+          "p4-g90"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g85",
+        "p4-g86",
+        "p4-g87",
+        "p4-g88",
+        "p4-g89",
+        "p4-g90"
+      ],
+      "replace_labels": [
+        "7"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-8",
+      "equation": {
+        "label": "Eq. 8",
+        "latex": "\\log p(D\\mid\\theta)\\propto\\frac{1}{N}\\sum_k\\left\\|\\frac{\\hat{Y}_k-Y_k}{\\tau\\cdot\\max Y_i}\\right\\|_2^2",
+        "meaning": "按原PDF公式(8)转录的对数似然表达式。原式二次误差项前没有负号；通常高斯对数似然应包含负的二次项及相应归一化项，这里疑似原文符号遗漏。该疑点应与原式并列展示，不能把正二次误差作为正确的高斯对数似然使用。 原式按页图转录，不是建议按正误差项实现似然。",
+        "symbols": [
+          {
+            "symbol": "\\hat Y_k,Y_k",
+            "meaning": "预测与观测的物种浓度向量。"
+          },
+          {
+            "symbol": "N,k",
+            "meaning": "观测数与观测索引。"
+          },
+          {
+            "symbol": "\\tau",
+            "meaning": "估计噪声水平，原文示例5%=0.05。"
+          },
+          {
+            "symbol": "\\max Y_i",
+            "meaning": "原文指定的观测归一化尺度；不能凭该记号补充未定义的维度或单位。"
+          },
+          {
+            "symbol": "\\|\\cdot\\|_2^2",
+            "meaning": "欧氏范数平方。"
+          }
+        ],
+        "source_ids": [
+          "p4-g91",
+          "p4-g92",
+          "p4-g93",
+          "p4-g94",
+          "p4-g95",
+          "p4-g96",
+          "p4-g97",
+          "p4-g98",
+          "p4-g99",
+          "p4-g100",
+          "p4-g101",
+          "p4-g102",
+          "p4-g103"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g91",
+        "p4-g92",
+        "p4-g93",
+        "p4-g94",
+        "p4-g95",
+        "p4-g96",
+        "p4-g97",
+        "p4-g98",
+        "p4-g99",
+        "p4-g100",
+        "p4-g101",
+        "p4-g102",
+        "p4-g103"
+      ],
+      "replace_labels": [
+        "8"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-9",
+      "equation": {
+        "label": "Eq. 9",
+        "latex": "\\begin{array}{l}p(\\theta,m)\\propto\\exp\\{\\mathcal{L}(\\theta)-\\tfrac{1}{2}m\\cdot m\\}\\\\\\mathcal{L}(\\theta)=\\log[p(D\\mid\\theta)p(\\theta)]\\end{array}",
+        "meaning": "原PDF式(9)是位置和动量的联合分布。L是对数未归一化后验；常规HMC势能U=-L+常数，绝不能把L本身或后验概率直接称为常规势能。正负号按原式保留并解释。",
+        "symbols": [
+          {
+            "symbol": "\\theta",
+            "meaning": "作为粒子位置的CRNN参数向量"
+          },
+          {
+            "symbol": "m",
+            "meaning": "辅助动量向量"
+          },
+          {
+            "symbol": "\\mathcal{L}(\\theta)",
+            "meaning": "对数未归一化后验；常规HMC势能为其负值，可差常数"
+          },
+          {
+            "symbol": "\\tfrac12m\\cdot m",
+            "meaning": "单位质量矩阵下的动能"
+          }
+        ],
+        "source_ids": [
+          "p4-g112",
+          "p4-g113",
+          "p4-g114",
+          "p4-g115",
+          "p4-g116",
+          "p4-g117"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g112",
+        "p4-g113",
+        "p4-g114",
+        "p4-g115",
+        "p4-g116",
+        "p4-g117"
+      ],
+      "replace_labels": [
+        "9"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-10",
+      "equation": {
+        "label": "Eq. 10",
+        "latex": "\\begin{array}{l}\\tilde m=m+\\frac{\\epsilon}{2}\\nabla_{\\theta}\\mathcal L(\\theta)\\\\\\tilde\\theta=\\theta+\\epsilon\\tilde m\\\\\\tilde{\\tilde m}=m+\\frac{\\epsilon}{2}\\nabla_{\\theta}\\mathcal L(\\tilde\\theta)\\end{array}",
+        "meaning": "按原PDF公式(10)转录的Leapfrog更新。第三行原文从m起算；常规Leapfrog的第二个半步应从中间动量m̃起算，因此这里疑似笔误。若采用常规形式实现，应明确这是推断修正。",
+        "symbols": [
+          {
+            "symbol": "\\epsilon",
+            "meaning": "积分步长"
+          },
+          {
+            "symbol": "\\theta",
+            "meaning": "粒子位置，即模型参数"
+          },
+          {
+            "symbol": "m",
+            "meaning": "粒子动量"
+          },
+          {
+            "symbol": "\\nabla_\\theta\\mathcal L(\\theta)",
+            "meaning": "对数未归一化后验对参数的梯度，等于负势能梯度"
+          }
+        ],
+        "source_ids": [
+          "p4-g118",
+          "p4-g119",
+          "p4-g120",
+          "p4-g121",
+          "p4-g122",
+          "p4-g123",
+          "p4-g124"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g118",
+        "p4-g119",
+        "p4-g120",
+        "p4-g121",
+        "p4-g122",
+        "p4-g123",
+        "p4-g124"
+      ],
+      "replace_labels": [
+        "10"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-11",
+      "equation": {
+        "label": "Eq. 11",
+        "latex": "\\alpha=\\min\\left\\{1,\\frac{\\exp\\left[\\mathcal L(\\tilde\\theta)-\\frac12\\tilde{\\tilde m}\\cdot\\tilde{\\tilde m}\\right]}{\\exp\\left[\\mathcal L(\\theta)-\\frac12m^0\\cdot m^0\\right]}\\right\\}",
+        "meaning": "Metropolis-Hastings接受概率。",
+        "symbols": [
+          {
+            "symbol": "\\alpha",
+            "meaning": "Metropolis接受概率"
+          },
+          {
+            "symbol": "m^0",
+            "meaning": "该轨迹的初始动量"
+          },
+          {
+            "symbol": "\\tilde\\theta,\\tilde{\\tilde m}",
+            "meaning": "提议的新位置与新动量"
+          }
+        ],
+        "source_ids": [
+          "p4-g125",
+          "p4-g126",
+          "p4-g127",
+          "p4-g128",
+          "p4-g129",
+          "p4-g130",
+          "p4-g131",
+          "p4-g132",
+          "p4-g133",
+          "p4-g134",
+          "p4-g135",
+          "p4-g136",
+          "p4-g137",
+          "p4-g138",
+          "p4-g139",
+          "p4-g140",
+          "p4-g141",
+          "p4-g142",
+          "p4-g143",
+          "p4-g144",
+          "p4-g145",
+          "p4-g146",
+          "p4-g147",
+          "p4-g148"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g125",
+        "p4-g126",
+        "p4-g127",
+        "p4-g128",
+        "p4-g129",
+        "p4-g130",
+        "p4-g131",
+        "p4-g132",
+        "p4-g133",
+        "p4-g134",
+        "p4-g135",
+        "p4-g136",
+        "p4-g137",
+        "p4-g138",
+        "p4-g139",
+        "p4-g140",
+        "p4-g141",
+        "p4-g142",
+        "p4-g143",
+        "p4-g144",
+        "p4-g145",
+        "p4-g146",
+        "p4-g147",
+        "p4-g148"
+      ],
+      "replace_labels": [
+        "11"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-12a",
+      "equation": {
+        "label": "Eq. 12a",
+        "latex": "\\Theta^*=\\arg\\min_{\\Theta}\\operatorname{KL}[q(\\theta\\mid\\Theta)\\|p(\\theta\\mid D)]",
+        "meaning": "变分推断的原始后验KL最小化目标。",
+        "symbols": [
+          {
+            "symbol": "\\theta",
+            "meaning": "CRNN模型参数。"
+          },
+          {
+            "symbol": "\\Theta,\\Theta^*",
+            "meaning": "变分分布参数及其最优值；本文均值场高斯的均值和方差。"
+          },
+          {
+            "symbol": "q,p(D|theta),p(theta),p(D)",
+            "meaning": "变分分布、似然、先验和数据证据。"
+          }
+        ],
+        "source_ids": [
+          "p4-g152",
+          "p4-g153",
+          "p4-g154",
+          "p4-g155"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g152",
+        "p4-g153",
+        "p4-g154",
+        "p4-g155"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-12b",
+      "equation": {
+        "label": "Eq. 12b",
+        "latex": "=\\arg\\min_{\\Theta}\\int q(\\theta\\mid\\Theta)\\log\\frac{q(\\theta\\mid\\Theta)}{p(\\theta\\mid D)}\\,d\\theta",
+        "meaning": "式12a中KL散度的积分展开；等号接续式12a。",
+        "symbols": [
+          {
+            "symbol": "\\theta",
+            "meaning": "CRNN模型参数。"
+          },
+          {
+            "symbol": "\\Theta,\\Theta^*",
+            "meaning": "变分分布参数及其最优值；本文均值场高斯的均值和方差。"
+          },
+          {
+            "symbol": "q,p(D|theta),p(theta),p(D)",
+            "meaning": "变分分布、似然、先验和数据证据。"
+          }
+        ],
+        "source_ids": [
+          "p4-g156",
+          "p4-g157",
+          "p4-g158",
+          "p4-g159",
+          "p4-g160",
+          "p4-g161"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g156",
+        "p4-g157",
+        "p4-g158",
+        "p4-g159",
+        "p4-g160",
+        "p4-g161"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-12c",
+      "equation": {
+        "label": "Eq. 12c",
+        "latex": "=\\arg\\min_{\\Theta}\\int q(\\theta\\mid\\Theta)\\log\\frac{q(\\theta\\mid\\Theta)p(D)}{p(D\\mid\\theta)p(\\theta)}\\,d\\theta",
+        "meaning": "用贝叶斯公式代入后验；等号接续式12b。",
+        "symbols": [
+          {
+            "symbol": "\\theta",
+            "meaning": "CRNN模型参数。"
+          },
+          {
+            "symbol": "\\Theta,\\Theta^*",
+            "meaning": "变分分布参数及其最优值；本文均值场高斯的均值和方差。"
+          },
+          {
+            "symbol": "q,p(D|theta),p(theta),p(D)",
+            "meaning": "变分分布、似然、先验和数据证据。"
+          }
+        ],
+        "source_ids": [
+          "p4-g162",
+          "p4-g163",
+          "p4-g164",
+          "p4-g165",
+          "p4-g166",
+          "p4-g167"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g162",
+        "p4-g163",
+        "p4-g164",
+        "p4-g165",
+        "p4-g166",
+        "p4-g167"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-12d",
+      "equation": {
+        "label": "Eq. 12d",
+        "latex": "=\\log p(D)+\\arg\\min_{\\Theta}\\int q(\\theta\\mid\\Theta)\\log\\frac{q(\\theta\\mid\\Theta)}{p(D\\mid\\theta)p(\\theta)}\\,d\\theta",
+        "meaning": "按原页式12d转录。这里把常数log p(D)写在argmin之外，是原文不严谨记法：常数可从优化目标中删去而不改变最优参数，不能把标量常数加到argmin返回的参数上。",
+        "symbols": [
+          {
+            "symbol": "\\theta",
+            "meaning": "CRNN模型参数。"
+          },
+          {
+            "symbol": "\\Theta,\\Theta^*",
+            "meaning": "变分分布参数及其最优值；本文均值场高斯的均值和方差。"
+          },
+          {
+            "symbol": "q,p(D|theta),p(theta),p(D)",
+            "meaning": "变分分布、似然、先验和数据证据。"
+          }
+        ],
+        "source_ids": [
+          "p4-g168",
+          "p4-g169",
+          "p4-g170",
+          "p4-g171",
+          "p4-g172",
+          "p4-g173"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g168",
+        "p4-g169",
+        "p4-g170",
+        "p4-g171",
+        "p4-g172",
+        "p4-g173"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-12e",
+      "equation": {
+        "label": "Eq. 12e",
+        "latex": "\\Theta^*=\\arg\\min_{\\Theta}\\left\\{\\mathrm{KL}[q(\\theta\\mid\\Theta)\\|p(\\theta)]-\\mathbb E_{q(\\theta\\mid\\Theta)}[\\log p(D\\mid\\theta)]\\right\\}",
+        "meaning": "变分推断的负ELBO目标：近似分布与先验的KL散度减去期望对数似然。Θ是待优化的分布参数，θ是反应网络参数；提取文本中的H/Y或h/y是字形映射，不代表原文混用了四种参数。",
+        "symbols": [
+          {
+            "symbol": "\\Theta",
+            "meaning": "变分分布参数；本文为各独立高斯分布的均值与方差"
+          },
+          {
+            "symbol": "\\theta",
+            "meaning": "CRNN的反应网络参数"
+          },
+          {
+            "symbol": "q(\\theta\\mid\\Theta)",
+            "meaning": "用于近似后验的参数化分布"
+          },
+          {
+            "symbol": "p(\\theta)",
+            "meaning": "参数先验"
+          },
+          {
+            "symbol": "p(D\\mid\\theta)",
+            "meaning": "数据似然"
+          },
+          {
+            "symbol": "\\mathrm{KL}[\\cdot\\|\\cdot]",
+            "meaning": "Kullback–Leibler散度"
+          },
+          {
+            "symbol": "\\mathbb E_q[\\cdot]",
+            "meaning": "关于q的期望"
+          }
+        ],
+        "source_ids": [
+          "p4-g174",
+          "p4-g175",
+          "p4-g176",
+          "p4-g177",
+          "p4-g178"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g174",
+        "p4-g175",
+        "p4-g176",
+        "p4-g177",
+        "p4-g178"
+      ],
+      "replace_labels": [
+        "12e",
+        "Eq12e"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-13",
+      "equation": {
+        "label": "Eq. 13",
+        "latex": "-\\mathrm{KL}[q(\\theta\\mid\\Theta)\\|p(\\theta)]+\\mathbb E_{q(\\theta\\mid\\Theta)}[\\log p(D\\mid\\theta)]",
+        "meaning": "证据下界ELBO，是式(12e)代价函数的负值。按此定义，ELBO ≤ log p(D)；原文称其为p(D)的下界，遗漏了对数。 对固定生成模型优化变分参数，log p(D)是常数；最大化ELBO等价于最小化KL(q||p(theta|D))，并非最大化p(D)。",
+        "symbols": [
+          {
+            "symbol": "\\mathrm{KL}[q(\\theta\\mid\\Theta)\\|p(\\theta)]",
+            "meaning": "近似后验与先验之间的KL散度"
+          },
+          {
+            "symbol": "\\mathbb E_{q(\\theta\\mid\\Theta)}[\\log p(D\\mid\\theta)]",
+            "meaning": "期望对数似然，即数据重构项"
+          }
+        ],
+        "source_ids": [
+          "p5-g184",
+          "p5-g185",
+          "p5-g186",
+          "p5-g187"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p5-g184",
+        "p5-g185",
+        "p5-g186",
+        "p5-g187"
+      ],
+      "replace_labels": [
+        "13"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "a9e030cfb5de7cba5913393be93b35a330037e1b83cb460e2759e06f850cc6e4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-14a",
+      "equation": {
+        "label": "Eq. 14a",
+        "latex": "\\Theta^*=\\arg\\min_{\\Theta}\\left[\\log q(\\tilde\\theta\\mid\\Theta)-\\log p(\\tilde\\theta)-\\log p(D\\mid\\tilde\\theta)\\right]",
+        "meaning": "BBB 算法使用的单样本近似目标函数，是公式 12e 的单样本近似。",
+        "symbols": [
+          {
+            "symbol": "\\tilde\\theta",
+            "meaning": "从q(θ|Θ)抽出的单个参数样本，见式(14b)"
+          },
+          {
+            "symbol": "\\Theta",
+            "meaning": "待优化的变分分布参数"
+          },
+          {
+            "symbol": "q(\\tilde\\theta\\mid\\Theta)",
+            "meaning": "近似后验在样本处的概率密度"
+          },
+          {
+            "symbol": "p(\\tilde\\theta)",
+            "meaning": "先验在样本处的概率密度"
+          },
+          {
+            "symbol": "p(D\\mid\\tilde\\theta)",
+            "meaning": "给定该参数样本的数据似然"
+          }
+        ],
+        "source_ids": [
+          "p5-g192",
+          "p5-g193",
+          "p5-g194",
+          "p5-g195",
+          "p5-g196",
+          "p5-g197",
+          "p5-g198"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p5-g192",
+        "p5-g193",
+        "p5-g194",
+        "p5-g195",
+        "p5-g196",
+        "p5-g197",
+        "p5-g198"
+      ],
+      "replace_labels": [
+        "14a"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "a9e030cfb5de7cba5913393be93b35a330037e1b83cb460e2759e06f850cc6e4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-14b",
+      "equation": {
+        "label": "Eq. 14b",
+        "latex": "\\tilde\\theta\\sim q(\\theta\\mid\\Theta)",
+        "meaning": "从当前变分分布抽取参数样本，用于式14a的单样本近似。",
+        "symbols": [
+          {
+            "symbol": "\\theta",
+            "meaning": "CRNN模型参数。"
+          },
+          {
+            "symbol": "\\Theta,\\Theta^*",
+            "meaning": "变分分布参数及其最优值；本文均值场高斯的均值和方差。"
+          },
+          {
+            "symbol": "q,p(D|theta),p(theta),p(D)",
+            "meaning": "变分分布、似然、先验和数据证据。"
+          }
+        ],
+        "source_ids": [
+          "p5-g196",
+          "p5-g197"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p5-g196",
+        "p5-g197"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "a9e030cfb5de7cba5913393be93b35a330037e1b83cb460e2759e06f850cc6e4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-15",
+      "equation": {
+        "label": "Eq. 15",
+        "latex": "\\tilde\\theta\\sim q(\\theta\\mid\\Theta^*)",
+        "meaning": "优化后从近似后验采样。VI不生成HMC马尔可夫链，但BBB仍使用随机采样，不能笼统声称VI完全不采样。",
+        "symbols": [
+          {
+            "symbol": "\\theta",
+            "meaning": "CRNN模型参数。"
+          },
+          {
+            "symbol": "\\Theta,\\Theta^*",
+            "meaning": "变分分布参数及其最优值；本文均值场高斯的均值和方差。"
+          },
+          {
+            "symbol": "q,p(D|theta),p(theta),p(D)",
+            "meaning": "变分分布、似然、先验和数据证据。"
+          }
+        ],
+        "source_ids": [
+          "p5-g198",
+          "p5-g199",
+          "p5-g200"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p5-g198",
+        "p5-g199",
+        "p5-g200"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "a9e030cfb5de7cba5913393be93b35a330037e1b83cb460e2759e06f850cc6e4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-16",
+      "equation": {
+        "label": "Eq. 16",
+        "latex": "2A \\xrightarrow{k_1=0.1} B, \\quad A \\xrightarrow{k_2=0.2} C, \\quad C \\xrightarrow{k_3=0.13} D, \\quad B + D \\xrightarrow{k_4=0.3} E",
+        "meaning": "基元反应网络的动力学方程，包含四个反应步骤及其速率常数。",
+        "symbols": [
+          {
+            "symbol": "A, B, C, D, E",
+            "meaning": "化学物种"
+          },
+          {
+            "symbol": "k_1, k_2, k_3, k_4",
+            "meaning": "速率常数，原文给出的数值依次为0.1、0.2、0.13、0.3；该处没有注明浓度单位，不凭本段推定具体单位。不同反应级数对应的速率常数单位也不同。"
+          }
+        ],
+        "source_ids": [
+          "p6-g211",
+          "p6-g212",
+          "p6-g213",
+          "p6-g214",
+          "p6-g215",
+          "p6-g216",
+          "p6-g217",
+          "p6-g218",
+          "p6-g219"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p6-g211",
+        "p6-g212",
+        "p6-g213",
+        "p6-g214",
+        "p6-g215",
+        "p6-g216",
+        "p6-g217",
+        "p6-g218",
+        "p6-g219"
+      ],
+      "replace_labels": [
+        "16"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          6
+        ],
+        "page_image_sha256": {
+          "6": "04a9b97aa1f8d49ca396be59e4a3e1256e30e7535e8c23e79f1c4792d3e7cce4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-17a",
+      "equation": {
+        "label": "Eq. 17a",
+        "latex": "\\text{TG} + \\text{ROH} \\xrightarrow{k_1} \\text{DG} + \\text{R}'\\text{CO}_2\\text{R}",
+        "meaning": "甘油三酯与醇反应生成二甘油酯和脂肪酸酯。",
+        "symbols": [
+          {
+            "symbol": "TG",
+            "meaning": "甘油三酯"
+          },
+          {
+            "symbol": "ROH",
+            "meaning": "醇"
+          },
+          {
+            "symbol": "DG",
+            "meaning": "二甘油酯"
+          },
+          {
+            "symbol": "k1",
+            "meaning": "反应速率常数"
+          }
+        ],
+        "source_ids": [
+          "p6-g227",
+          "p6-g228",
+          "p6-g229"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p6-g227",
+        "p6-g228",
+        "p6-g229"
+      ],
+      "replace_labels": [
+        "17a"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          6
+        ],
+        "page_image_sha256": {
+          "6": "04a9b97aa1f8d49ca396be59e4a3e1256e30e7535e8c23e79f1c4792d3e7cce4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-17b",
+      "equation": {
+        "label": "Eq. 17b",
+        "latex": "\\text{DG} + \\text{ROH} \\xrightarrow{k_2} \\text{MG} + \\text{R}'\\text{CO}_2\\text{R}",
+        "meaning": "二甘油酯与醇反应生成单甘油酯和脂肪酸酯。",
+        "symbols": [
+          {
+            "symbol": "MG",
+            "meaning": "单甘油酯"
+          },
+          {
+            "symbol": "k2",
+            "meaning": "反应速率常数"
+          }
+        ],
+        "source_ids": [
+          "p6-g230",
+          "p6-g231",
+          "p6-g232"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p6-g230",
+        "p6-g231",
+        "p6-g232"
+      ],
+      "replace_labels": [
+        "17b"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          6
+        ],
+        "page_image_sha256": {
+          "6": "04a9b97aa1f8d49ca396be59e4a3e1256e30e7535e8c23e79f1c4792d3e7cce4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-17c",
+      "equation": {
+        "label": "Eq. 17c",
+        "latex": "\\text{MG} + \\text{ROH} \\xrightarrow{k_3} \\text{GL} + \\text{R}'\\text{CO}_2\\text{R}",
+        "meaning": "单甘油酯与醇反应生成甘油和脂肪酸酯。",
+        "symbols": [
+          {
+            "symbol": "GL",
+            "meaning": "甘油"
+          },
+          {
+            "symbol": "k3",
+            "meaning": "反应速率常数"
+          }
+        ],
+        "source_ids": [
+          "p6-g233",
+          "p6-g234",
+          "p6-g235"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p6-g233",
+        "p6-g234",
+        "p6-g235"
+      ],
+      "replace_labels": [
+        "17c"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          6
+        ],
+        "page_image_sha256": {
+          "6": "04a9b97aa1f8d49ca396be59e4a3e1256e30e7535e8c23e79f1c4792d3e7cce4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-18",
+      "equation": {
+        "label": "Eq. 18",
+        "latex": "E + S \\underset{k_r}{\\stackrel{k_f}{\\rightleftharpoons}} ES \\xrightarrow{k_{cat}} E + P",
+        "meaning": "Michaelis-Menten 酶动力学反应机理。E+S 可逆结合生成 ES，ES 不可逆转化为 E+P。",
+        "symbols": [
+          {
+            "symbol": "E",
+            "meaning": "enzyme (酶)"
+          },
+          {
+            "symbol": "S",
+            "meaning": "substrate (底物)"
+          },
+          {
+            "symbol": "ES",
+            "meaning": "enzyme–substrate complex (酶-底物复合物)"
+          },
+          {
+            "symbol": "P",
+            "meaning": "product (产物)"
+          },
+          {
+            "symbol": "k_f",
+            "meaning": "正向结合速率常数（原文此处简称reaction rate，下文称rate constants）"
+          },
+          {
+            "symbol": "k_r",
+            "meaning": "逆向解离速率常数"
+          },
+          {
+            "symbol": "k_{cat}",
+            "meaning": "产物形成步骤的速率常数"
+          }
+        ],
+        "source_ids": [
+          "p7-g250",
+          "p7-g251",
+          "p7-g252",
+          "p7-g253",
+          "p7-g254",
+          "p7-g255",
+          "p7-g256"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p7-g250",
+        "p7-g251",
+        "p7-g252",
+        "p7-g253",
+        "p7-g254",
+        "p7-g255",
+        "p7-g256"
+      ],
+      "replace_labels": [
+        "18"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          7
+        ],
+        "page_image_sha256": {
+          "7": "0031585ab6d2704fa5c926a9524ca7721014181e4a32f9738bddcfa6cc9f7445"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-19",
+      "equation": {
+        "label": "Eq. 19",
+        "latex": "W = \\begin{bmatrix} W_a \\\\ -W_a \\end{bmatrix}",
+        "meaning": "基于可逆反应正逆向化学计量系数相反的物理约束，构建化学计量矩阵 W。 方括号在原提取中对应p7-g258/g259（含制表/空白字形），已按页图恢复；不得将这些字形视作无意义空白。",
+        "symbols": [
+          {
+            "symbol": "W",
+            "meaning": "stoichiometry matrix (化学计量矩阵)"
+          },
+          {
+            "symbol": "W_a",
+            "meaning": "actual weight matrix to be determined (待确定的实际权重矩阵)"
+          }
+        ],
+        "source_ids": [
+          "p7-g257",
+          "p7-g258",
+          "p7-g259",
+          "p7-g260",
+          "p7-g261",
+          "p7-g262",
+          "p7-g263",
+          "p7-g264",
+          "p7-g265"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p7-g257",
+        "p7-g258",
+        "p7-g259",
+        "p7-g260",
+        "p7-g261",
+        "p7-g262",
+        "p7-g263",
+        "p7-g264",
+        "p7-g265"
+      ],
+      "replace_labels": [
+        "19"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          7
+        ],
+        "page_image_sha256": {
+          "7": "0031585ab6d2704fa5c926a9524ca7721014181e4a32f9738bddcfa6cc9f7445"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-20",
+      "equation": {
+        "label": "Eq. 20",
+        "latex": "\\begin{array}{l}E+S\\xrightarrow{2.0}ES\\\\ES\\xrightarrow{2.5}E+0.4S+0.6P\\end{array}",
+        "meaning": "原文给出的识别反应。第二式分支2.5×0.4=1.0、2.5×0.6=1.5与前述kr、kcat对应；第一式原页标2.0，而正文合成数据kf=2.5。保留两处数值，不把“数学等价”的原文表述扩写为所有速率常数完全相同。",
+        "symbols": [
+          {
+            "symbol": "E,S,ES,P",
+            "meaning": "酶、底物、酶底物复合物和产物。"
+          },
+          {
+            "symbol": "2.0,2.5",
+            "meaning": "原页所列识别模型参数；原处未给单位，不自行补单位。"
+          },
+          {
+            "symbol": "0.4,0.6",
+            "meaning": "两分支的产物计量系数。"
+          }
+        ],
+        "source_ids": [
+          "p7-g266",
+          "p7-g267",
+          "p7-g268",
+          "p7-g269",
+          "p7-g270",
+          "p7-g271",
+          "p7-g272"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p7-g266",
+        "p7-g267",
+        "p7-g268",
+        "p7-g269",
+        "p7-g270",
+        "p7-g271",
+        "p7-g272"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          7
+        ],
+        "page_image_sha256": {
+          "7": "0031585ab6d2704fa5c926a9524ca7721014181e4a32f9738bddcfa6cc9f7445"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-21",
+      "equation": {
+        "label": "Eq. 21",
+        "latex": "\\begin{array}{l}S+MAP3K\\rightarrow S+MAP3K^*\\\\MAP3K^*+MAP2K\\rightarrow MAP3K^*+MAP2K^*\\\\MAP2K^*+MAPK\\rightarrow MAP2K^*+MAPK^*\\\\MAPK^*+TF\\rightarrow MAPK^*+TF^*\\\\MAP3K^*\\rightarrow MAP3K\\\\MAP2K^*\\rightarrow MAP2K\\\\MAPK^*\\rightarrow MAPK\\\\TF^*\\rightarrow TF\\end{array}",
+        "meaning": "原页MAPK催化反应网络：四个活化/磷酸化步骤与四个失活/去磷酸化步骤。催化物种在同一步反应两侧出现，净计量为0并不意味着其浓度不影响速率。",
+        "symbols": [
+          {
+            "symbol": "S",
+            "meaning": "初始刺激物。"
+          },
+          {
+            "symbol": "MAP3K,MAP2K,MAPK",
+            "meaning": "三级激酶。"
+          },
+          {
+            "symbol": "TF",
+            "meaning": "转录因子。"
+          },
+          {
+            "symbol": "*",
+            "meaning": "活化/磷酸化状态。"
+          }
+        ],
+        "source_ids": [
+          "p8-g291",
+          "p8-g292",
+          "p8-g293",
+          "p8-g294",
+          "p8-g295",
+          "p8-g296",
+          "p8-g297",
+          "p8-g298",
+          "p8-g299",
+          "p8-g300"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p8-g291",
+        "p8-g292",
+        "p8-g293",
+        "p8-g294",
+        "p8-g295",
+        "p8-g296",
+        "p8-g297",
+        "p8-g298",
+        "p8-g299",
+        "p8-g300"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          8
+        ],
+        "page_image_sha256": {
+          "8": "2697f64199699c3d7c139a4baa70ac13d5342914c6dbf2baddc0f335ad4ffbd9"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-22",
+      "equation": {
+        "label": "Eq. 22",
+        "latex": "W_{in} = \\text{clamp}(-W, 0); \\quad W_{out} = W \\odot W_c",
+        "meaning": "处理催化反应的权重解耦：Win=clamp(−W,0)给输入侧的非负反应级数；Wout=W⊙Wc控制净计量输出。当某催化剂在对应反应的Wc元素为0时，其净输出项为0，仍可通过Win影响速率。训练阶段Wc元素约束在[0,1]，训练后非零元素归一化为1，并相应调整k。",
+        "symbols": [
+          {
+            "symbol": "W",
+            "meaning": "原始权重矩阵。"
+          },
+          {
+            "symbol": "W_c",
+            "meaning": "通道选择矩阵；训练时元素在[0,1]，训练后非零元素归一为1，并相应调整k；贝叶斯阶段固定Wc。"
+          },
+          {
+            "symbol": "\\odot",
+            "meaning": "逐元素乘法。"
+          }
+        ],
+        "source_ids": [
+          "p8-g301",
+          "p8-g302",
+          "p8-g303",
+          "p8-g304",
+          "p8-g305"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p8-g301",
+        "p8-g302",
+        "p8-g303",
+        "p8-g304",
+        "p8-g305"
+      ],
+      "replace_labels": [
+        "22"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          8
+        ],
+        "page_image_sha256": {
+          "8": "2697f64199699c3d7c139a4baa70ac13d5342914c6dbf2baddc0f335ad4ffbd9"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-23",
+      "equation": {
+        "label": "Eq. 23",
+        "latex": "p(\\tilde y\\mid\\tilde x)=\\sum_j p(\\tilde y\\mid\\tilde x,M_j)p(M_j)=\\sum_j\\frac{1}{N_s}\\sum_i p(\\tilde y\\mid\\tilde x,\\tilde\\theta_j^i)p(M_j)",
+        "meaning": "给定新初始条件x̃，预测浓度轨迹ỹ的分布按模型权重混合；每个模型的条件预测分布用Ns个参数样本的平均近似。原式没有额外的分母或证据项，θ̃ⱼⁱ为模型参数样本。",
+        "symbols": [
+          {
+            "symbol": "\\tilde y,\\tilde x",
+            "meaning": "预测的浓度轨迹及未见初始条件。"
+          },
+          {
+            "symbol": "M_j",
+            "meaning": "第j个候选模型。"
+          },
+          {
+            "symbol": "\\tilde\\theta_j^i",
+            "meaning": "第j个模型的第i个参数样本，不是浓度轨迹。"
+          },
+          {
+            "symbol": "N_s",
+            "meaning": "每个模型用于预测平均的参数样本数；不要与式5的物种数记号混同。"
+          },
+          {
+            "symbol": "p(M_j)",
+            "meaning": "模型混合权重。"
+          }
+        ],
+        "source_ids": [
+          "p9-g326",
+          "p9-g327",
+          "p9-g328",
+          "p9-g329",
+          "p9-g330",
+          "p9-g331",
+          "p9-g332",
+          "p9-g333",
+          "p9-g334",
+          "p9-g335",
+          "p9-g336",
+          "p9-g337",
+          "p9-g338",
+          "p9-g339",
+          "p9-g340",
+          "p9-g341",
+          "p9-g342",
+          "p9-g343"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p9-g326",
+        "p9-g327",
+        "p9-g328",
+        "p9-g329",
+        "p9-g330",
+        "p9-g331",
+        "p9-g332",
+        "p9-g333",
+        "p9-g334",
+        "p9-g335",
+        "p9-g336",
+        "p9-g337",
+        "p9-g338",
+        "p9-g339",
+        "p9-g340",
+        "p9-g341",
+        "p9-g342",
+        "p9-g343"
+      ],
+      "replace_labels": [
+        "(23)"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          9
+        ],
+        "page_image_sha256": {
+          "9": "e866d9f88cfc88fe82cc58142446ed0a69df4bd0451e2f96bc786fe022cc242e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-eq-24",
+      "equation": {
+        "label": "Eq. 24",
+        "latex": "p(M_j)=p(k_j)\\propto\\frac{\\lambda^{k_j}}{k_j!}e^{\\lambda}\\quad(k_1\\le k_j\\le k_{N_j})",
+        "meaning": "按反应数kj给候选模型Mj分配截断泊松比例权重，须在候选范围内归一化。原PDF使用e^(+λ)，常见PMF使用e^(−λ)；固定λ时两者只是公共因子，归一化后权重相同。此处λ是未截断泊松基分布的参数，截断后的均值一般不等于λ。",
+        "symbols": [
+          {
+            "symbol": "p(M_j)",
+            "meaning": "模型 Mj 的先验概率"
+          },
+          {
+            "symbol": "k_j",
+            "meaning": "第 j 个模型的反应数量"
+          },
+          {
+            "symbol": "\\lambda",
+            "meaning": "未截断泊松基分布的参数；不等同于截断分布的均值"
+          },
+          {
+            "symbol": "k_1, k_{N_j}",
+            "meaning": "反应数量的下限和上限"
+          }
+        ],
+        "source_ids": [
+          "p9-g343",
+          "p9-g344",
+          "p9-g345",
+          "p9-g346",
+          "p9-g347"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p9-g343",
+        "p9-g344",
+        "p9-g345",
+        "p9-g346",
+        "p9-g347"
+      ],
+      "replace_labels": [
+        "(24)"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          9
+        ],
+        "page_image_sha256": {
+          "9": "e866d9f88cfc88fe82cc58142446ed0a69df4bd0451e2f96bc786fe022cc242e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    }
+  ],
+  "content_corrections": [
+    {
+      "id": "bcrnn-elbo-exact",
+      "section": "critique",
+      "field": "body",
+      "original": "原文称 ELBO 是边缘数据概率 p(D) 的下界。严格来说，ELBO 是对数边缘似然 log p(D) 的下界。虽然单调性使得最大化 ELBO 等价于最大化 p(D)，但在数学表述上应区分对数域和概率域。",
+      "corrected": "原文将 ELBO 称为 p(D) 的下界；按式(12e)与(13)，它是 log p(D) 的下界。固定生成模型时，log p(D) 与变分参数无关，最大化 ELBO 等价于最小化近似分布与真实后验之间的 KL 散度，并非最大化 p(D)。",
+      "source_ids": [
+        "p5-g187"
+      ],
+      "why": "删除不成立的单调性推论，保留原文log域与概率域疑点。",
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "a9e030cfb5de7cba5913393be93b35a330037e1b83cb460e2759e06f850cc6e4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-hmc-glossary-exact",
+      "section": "glossary",
+      "field": "definition",
+      "original": "一种马尔可夫链蒙特卡洛方法，通过引入辅助动量变量并将目标分布视为势能，利用哈密顿动力学进行高效采样，减少随机游走。",
+      "corrected": "一种马尔可夫链蒙特卡洛方法。引入辅助动量，并将目标后验的负对数（可差常数）作为势能，利用哈密顿动力学构造提议以减少随机游走。本文式(9)的L是对数未归一化后验，因此常规势能为-L+常数。",
+      "source_ids": [
+        "p4-g105"
+      ],
+      "why": "目标概率分布本身不是势能，需明确负对数关系。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-complete-p3-g38",
+      "section": "paragraphs",
+      "field": "explanation",
+      "source_ids": [
+        "p3-g38"
+      ],
+      "original": "本节介绍贝叶斯化学反应神经网络（B-CRNN）。首先简要回顾确定性版本的CRNN，然后介绍两种对CRNN结果进行不确定性量化的方法，即贝叶斯CRNN。",
+      "corrected": "2 贝叶斯化学反应神经网络",
+      "why": "恢复完整的来源内容或纯标题对应；不以目录式说明代替参数定义，不借用邻段文字。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立目视当前PDF完整页3或页4，并与原文参数定义、式5/6/9和当前中文逐段内容逐项核对。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-complete-p3-g63",
+      "section": "paragraphs",
+      "field": "explanation",
+      "source_ids": [
+        "p3-g63"
+      ],
+      "original": "定义阿伦尼乌斯方程参数（A, T, b, Ea, R），并说明如何将这些方程整合为神经网络架构（Fig. 1a）。输入为浓度对数，权重/偏置为化学计量系数/阿伦尼乌斯参数，输出为生成速率。",
+      "corrected": "其中，A是指前因子，T是温度，b是温度依赖性的拟合参数，Ea是活化能，R是气体常数。方程(2)–(4)可整合成图1a所示的神经网络结构。网络的输入为物种浓度的对数；权重和偏置分别对应物种的化学计量系数与反应速率的阿伦尼乌斯定律参数；网络的输出为物种生成速率。",
+      "why": "恢复完整的来源内容或纯标题对应；不以目录式说明代替参数定义，不借用邻段文字。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立目视当前PDF完整页3或页4，并与原文参数定义、式5/6/9和当前中文逐段内容逐项核对。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-complete-p3-g71",
+      "section": "paragraphs",
+      "field": "explanation",
+      "source_ids": [
+        "p3-g71"
+      ],
+      "original": "定义化学计量系数矩阵W及其维度，解释负元素含义，并给出CRNN对生成速率Y(t)的估计。",
+      "corrected": "其中，W是Ns×Nr的化学计量系数矩阵，Ns为物种数，Nr为反应数。W中的负元素表示相应反应中的反应物。将时刻t各物种浓度组成的向量记为Y(t)，则CRNN（式5）给出生成速率的估计，即浓度向量的时间导数。原始文字层的点号等字形存在映射问题，式6原页显示的是带时间导数点号的Y(t)，不能把浓度向量Y(t)本身当作生成速率。",
+      "why": "恢复完整的来源内容或纯标题对应；不以目录式说明代替参数定义，不借用邻段文字。",
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立目视当前PDF完整页3或页4，并与原文参数定义、式5/6/9和当前中文逐段内容逐项核对。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-hmc-method-exact",
+      "section": "methods",
+      "field": "body",
+      "source_ids": [
+        "p4-g105",
+        "p4-g116",
+        "p4-g124",
+        "p4-g149"
+      ],
+      "original": "输入：训练数据集 D，噪声水平估计 t。操作：1. 初始化动量 m ~ N(0, 1)。2. 执行 L 步步长为 e 的 Leapfrog 积分更新粒子位置 h 和动量 m。3. 根据 Metropolis 准则以概率 a 接受新状态。输出：参数 h 的样本序列。假设：后验分布对应粒子势能，高斯似然。",
+      "corrected": "输入为训练数据D和噪声水平估计τ。先为轨迹随机初始化辅助动量，再用步长ε执行L步Leapfrog更新，随后按式(11)的Metropolis接受概率接受或拒绝提议，重复生成参数样本。文中式(9)的L(θ)=log[p(D|θ)p(θ)]是对数未归一化后验；常规HMC势能应为-L(θ)+常数。式(10)第三行原印m而非中间动量，须保留原式并明确其与标准Leapfrog的差异，不能照未核验原式直接实现。",
+      "why": "统一方法卡与原页式9的符号约定，避免将后验本身当作势能。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立目视当前PDF完整页3或页4，并与原文参数定义、式5/6/9和当前中文逐段内容逐项核对。",
+        "original_formula_preserved": true
+      }
+    }
+  ],
+  "semantic_constraints": [
+    {
+      "id": "bcrnn-hmc-sign",
+      "instruction": "L(theta)=log[p(D|theta)p(theta)]是对数未归一化后验；常规势能U=-L+常数。后验概率、对数后验和负对数后验三者必须区分，主题、公式、方法、自测、术语应一致。式9联合分布exp(L-m·m/2)保留原式。",
+      "source_ids": [
+        "p4-g112",
+        "p4-g113",
+        "p4-g114",
+        "p4-g115",
+        "p4-g116",
+        "p4-g117"
+      ],
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-likelihood-source-conflict",
+      "instruction": "式8原PDF二次误差前未印负号，复核原式时保留正号并指出疑点。常规高斯log likelihood有负二次项；不可把原文正误差表达教作可直接实现的正确似然，也不能把未核验的推断修式冒充原式。",
+      "source_ids": [
+        "p4-g91",
+        "p4-g92",
+        "p4-g93",
+        "p4-g94",
+        "p4-g95",
+        "p4-g96",
+        "p4-g97",
+        "p4-g98",
+        "p4-g99",
+        "p4-g100",
+        "p4-g101",
+        "p4-g102",
+        "p4-g103"
+      ],
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-leapfrog-source-conflict",
+      "instruction": "式10第三行右端原印m，常规第二半步应从中间动量m_tilde更新。原式必须原样展示并单列说明推断修正；正文tilde q记号与theta不一致也属原页记号问题。",
+      "source_ids": [
+        "p4-g118",
+        "p4-g119",
+        "p4-g120",
+        "p4-g121",
+        "p4-g122",
+        "p4-g123",
+        "p4-g124"
+      ],
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-elbo",
+      "instruction": "ELBO=-KL(q||prior)+E_q log likelihood，是log p(D)下界。固定生成模型时最大ELBO等价最小KL(q||posterior)，不是最大p(D)。若优化模型参数，也只是优化证据下界，不能由单调性声称等价。式12d将log证据加在argmin之外是不严谨原式记法，不能当正确推导教授。",
+      "source_ids": [
+        "p4-g168",
+        "p4-g169",
+        "p4-g170",
+        "p4-g171",
+        "p4-g172",
+        "p4-g173",
+        "p4-g174",
+        "p4-g175",
+        "p4-g176",
+        "p4-g177",
+        "p5-g184",
+        "p5-g185",
+        "p5-g186",
+        "p5-g187"
+      ],
+      "verification": {
+        "pages": [
+          4,
+          5
+        ],
+        "page_image_sha256": {
+          "4": "6c82f1969a44f201ecb29e79a4590bbc2e4c2e55d3a0e7f27d89ce87776a39a0",
+          "5": "a9e030cfb5de7cba5913393be93b35a330037e1b83cb460e2759e06f850cc6e4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-four-standard-deviations",
+      "instruction": "图3、图6、图7、图8、图10明确写4 standard deviations。保留“4个标准差的区间”并说明这是作者的区间描述；除非有明确端点定义或计算，不自行替换为95%置信区间，也不把贝叶斯可信区间与频率学置信区间混称。",
+      "source_ids": [
+        "p5-g202",
+        "p7-g246",
+        "p7-g280",
+        "p8-g309",
+        "p9-g350",
+        "p10-g356",
+        "p10-g366"
+      ],
+      "verification": {
+        "pages": [
+          5,
+          7,
+          8,
+          9,
+          10
+        ],
+        "page_image_sha256": {
+          "5": "a9e030cfb5de7cba5913393be93b35a330037e1b83cb460e2759e06f850cc6e4",
+          "7": "0031585ab6d2704fa5c926a9524ca7721014181e4a32f9738bddcfa6cc9f7445",
+          "8": "2697f64199699c3d7c139a4baa70ac13d5342914c6dbf2baddc0f335ad4ffbd9",
+          "9": "e866d9f88cfc88fe82cc58142446ed0a69df4bd0451e2f96bc786fe022cc242e",
+          "10": "ec9713299b7ee40ed641a7b891a250fad26d70aaf6c53028b925460addc16149"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-weight-roles",
+      "instruction": "式5 Wout=W是净计量矩阵，负项不能删除；Y(t)为浓度向量，dot Y为生成速率。式22 Wc训练时在[0,1]，非零项训练后归一到1并调整k，贝叶斯阶段固定Wc，仅W/k赋予高斯分布。",
+      "source_ids": [
+        "p3-g65",
+        "p3-g66",
+        "p3-g67",
+        "p3-g68",
+        "p3-g69",
+        "p3-g70",
+        "p3-g71",
+        "p3-g72",
+        "p3-g73",
+        "p8-g301",
+        "p8-g302",
+        "p8-g303",
+        "p8-g304",
+        "p8-g305"
+      ],
+      "verification": {
+        "pages": [
+          3,
+          8
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e",
+          "8": "2697f64199699c3d7c139a4baa70ac13d5342914c6dbf2baddc0f335ad4ffbd9"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-symbol-definitions",
+      "instruction": "中文逐段译述须完整给出A=指前因子、T=温度、b=温度依赖拟合参数、Ea=活化能、R=气体常数，以及Ns/Nr、Y和dot Y定义；不能写“本段定义了参数”代替翻译。",
+      "source_ids": [
+        "p3-g63",
+        "p3-g71"
+      ],
+      "verification": {
+        "pages": [
+          3
+        ],
+        "page_image_sha256": {
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-posterior-family",
+      "instruction": "VI/BBB使用独立高斯均值场近似，忽略参数相关性；VI并非完全不采样，单样本BBB目标明确抽取theta。HMC和VI差异不可只归因于测量噪声，也不可把独立高斯近似当精确后验。",
+      "source_ids": [
+        "p5-g187",
+        "p5-g190",
+        "p5-g191",
+        "p5-g196",
+        "p5-g198",
+        "p5-g199"
+      ],
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "a9e030cfb5de7cba5913393be93b35a330037e1b83cb460e2759e06f850cc6e4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-poisson-mixing",
+      "instruction": "式24原页印e^(+lambda)，固定lambda时它是公共因子，在有限候选集内归一化后与常用e^(-lambda)给相同权重；不要静默改原式。lambda是未截断Poisson参数，不一般等于截断后均值。式23theta_j^i是参数样本，Ns为采样数，不是浓度轨迹或式5物种数。",
+      "source_ids": [
+        "p9-g326",
+        "p9-g327",
+        "p9-g328",
+        "p9-g329",
+        "p9-g330",
+        "p9-g331",
+        "p9-g332",
+        "p9-g333",
+        "p9-g334",
+        "p9-g335",
+        "p9-g336",
+        "p9-g337",
+        "p9-g338",
+        "p9-g339",
+        "p9-g340",
+        "p9-g341",
+        "p9-g342",
+        "p9-g343",
+        "p9-g344",
+        "p9-g345",
+        "p9-g346",
+        "p9-g347"
+      ],
+      "verification": {
+        "pages": [
+          9
+        ],
+        "page_image_sha256": {
+          "9": "e866d9f88cfc88fe82cc58142446ed0a69df4bd0451e2f96bc786fe022cc242e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-mixture-dispersion",
+      "instruction": "原文称按模型权重平均标准差，这应作为作者实施描述保留，不能无说明等同于一般混合分布的精确标准差。若解释精确混合方差，须明确是背景公式Var(Y)=sum w_j[Var_j(Y)+(mu_j-mu)^2]，包含模型均值间差异。",
+      "source_ids": [
+        "p9-g347"
+      ],
+      "verification": {
+        "pages": [
+          9
+        ],
+        "page_image_sha256": {
+          "9": "e866d9f88cfc88fe82cc58142446ed0a69df4bd0451e2f96bc786fe022cc242e"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "bcrnn-name-expansion",
+      "instruction": "论文标题、摘要与引言明确 B-CRNN 为 Bayesian chemical reaction neural network（贝叶斯化学反应神经网络），其中 CRNN 是 Chemical Reaction Neural Network（化学反应神经网络）。在全部概览、主题、方法、术语与自测采用这个原文定义，不得展开为 Bayesian Convolutional Recurrent Neural Network、Continuous Reaction Neural Network，或翻译成贝叶斯卷积循环神经网络/连续反应神经网络。其贝叶斯扩展对化学反应网络的物理参数与预测不确定性建模。",
+      "source_ids": [
+        "p2-g19",
+        "p2-g23",
+        "p3-g37"
+      ],
+      "verification": {
+        "pages": [
+          2,
+          3
+        ],
+        "page_image_sha256": {
+          "2": "09b8bf315808c092d44a47cb2a614b35bed65b1d1828a44b8b0ccd714539e82c",
+          "3": "35dc1e5ca16c7a4e75cca031b1f56aa799aaaa51cb1f2863d47388e770eb196e"
+        },
+        "method": "独立审阅者直接核对完整原文及对应原页图；此约束来源为论文自身的标题、定义或完整段落，不以模型草稿作为科学依据。"
+      }
+    }
+  ]
+}

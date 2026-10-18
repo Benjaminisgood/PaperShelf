@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-10-18",
+  "human_scientific_acceptance": false,
+  "bundles": [
+    {
+      "bundle": "evidence/quality-v2/formula-review-crnn.json",
+      "sha256": "fad41b2dc6fe8271b22efaf3eb19efa6e239b84c7372e176d8daa5c5415feced",
+      "equations": 15,
+      "content_corrections": 0,
+      "semantic_constraints": 8,
+      "bundle_ids_unique": true,
+      "normalized_equation_keys_unique": true,
+      "alias_ownership_unique": true,
+      "source_ids_consistent": true,
+      "source_and_page_image_hashes_valid": true,
+      "mathml_converted": 15
+    },
+    {
+      "bundle": "evidence/quality-v2/formula-review-bcrnn.json",
+      "sha256": "4f379a7621e1975fc2f97f9bb41cb15caf48a6548265005291ac8c111f815409",
+      "equations": 31,
+      "content_corrections": 6,
+      "semantic_constraints": 11,
+      "bundle_ids_unique": true,
+      "normalized_equation_keys_unique": true,
+      "alias_ownership_unique": true,
+      "source_ids_consistent": true,
+      "source_and_page_image_hashes_valid": true,
+      "mathml_converted": 31
+    }
+  ]
+}

@@ -10,6 +10,11 @@ _WRAPPED_WORD = re.compile(r"([A-Za-z]{2,})[-\u2010\u00ad][ \t]*\n[ \t]*([A-Za-z
 _LIGATURES = str.maketrans({'\ufb00': 'ff', '\ufb01': 'fi', '\ufb02': 'fl', '\ufb03': 'ffi', '\ufb04': 'ffl', '\ufb05': 'st', '\ufb06': 'st'})
 _SECTION = re.compile(r'^\s*(?:\d+(?:\.\d+)*\.?\s+)?(?:abstract|introduction|background|methods?|materials(?: and methods)?|results(?: and discussion)?|discussion|conclusions?|references(?: and notes)?|acknowledg(?:e)?ments?|(?:supporting information|supplementary (?:information|materials?))(?: for)?)\s*$', re.I)
 _PUBLISHER_NOTICE = re.compile(r'(?:^view (?:article|journal|issue)|^cite this:|^received\b.{0,100}\baccepted\b|this (?:article|journal) is (?:licensed|©)|open access article\..*downloaded on|^terms of use:|^permanent link:|^published version:)', re.I)
+_MATH_WORDS = {'ln', 'log', 'exp', 'sin', 'cos', 'tan', 'arg', 'min', 'max', 'inf', 'sup',
+               'det', 'diag', 'tr', 'sum', 'prod', 'lim', 'loss'}
+_PROSE_CUES = re.compile(r'\b(?:where|which|whose|when|because|since|although|therefore|thus|hence|'
+                         r'denote|denotes|represent|represents|corresponds|indicates|defined|shown|given|'
+                         r'we|our|their|the|is|are|was|were|can|should|must|will|consider|let)\b', re.I)
 
 
 def _lexical_evidence(blocks):
@@ -109,6 +114,32 @@ def _role_signature(text):
     return re.sub(r'\d+', '#', text)
 
 
+def _standalone_expression(text):
+    """Recognize symbolic display text without interpreting its PDF glyphs.
+
+    A few ASCII identifiers can make a formula look like a short English
+    sentence. Require a mathematical shape and no prose clause before moving
+    it to the formula index. Mixed explanation stays in the main reading.
+    This never translates font encodings such as ¼/þ into guessed operators.
+    """
+    text = re.sub(r'\s+', ' ', text).strip()
+    if _PROSE_CUES.search(text) or re.search(r'[\u3400-\u9fff]', text):
+        return False
+    mathematical_shape = re.search(r'[=∑∏∫⇒→⇌¼þ÷]|->|[pqL]ð|\b(?:log|ln|exp)\s*\(|[A-Za-z]\([^)]*\|', text)
+    # Some PDF math fonts encode a reaction arrow as !. A bare rate constant
+    # followed by a molecular identifier is symbolic; an exclamation mark in
+    # a sentence (including "No CO!") is not sufficient evidence.
+    bare_rate_reaction = re.fullmatch(r'k[a-z0-9_]{0,3}\s+[A-Z][A-Z0-9*]*\s*!', text)
+    if not mathematical_shape and not bare_rate_reaction:
+        return False
+    tokens = re.findall(r'(?<![A-Za-z0-9])[A-Za-z][A-Za-z0-9]*(?![A-Za-z0-9])', text)
+    prose_words = [word for word in tokens if len(word) >= 3 and word.casefold() not in _MATH_WORDS
+                   and not re.search(r'[0-9]', word) and not word.isupper()
+                   and not re.search(r'[A-Z]', word[1:])
+                   and not re.search(r'\b' + re.escape(word) + r'\s*\(', text)]
+    return len(prose_words) <= 2
+
+
 def _reading_role(block, metrics, repeated, cover_pages, body_sizes, page_counts, body_pages):
     text = re.sub(r'\s+', ' ', block['text']).strip()
     page_key = _document_page(block)
@@ -159,6 +190,8 @@ def _reading_role(block, metrics, repeated, cover_pages, body_sizes, page_counts
         return 'heading', True, ''
     if re.match(r'^(?:\d+(?:\.\d+)*\.?\s+){1,2}[A-Z][A-Za-z :–—-]+$', text) and len(text.split()) < 20:
         return 'heading', True, ''
+    if _standalone_expression(text):
+        return 'equation_fragment', True, '独立数学或反应表达式，保留原始符号和行结构；不交由正文校订猜改字体编码或运算符。'
     lexical = re.findall(r'[A-Za-z]{3,}|[\u3400-\u9fff]', text)
     word_tokens = re.findall(r'[A-Za-z][A-Za-z0-9]*|[\u3400-\u9fff]', text)
     # Word count alone does not distinguish an axis label from a short but
@@ -217,6 +250,32 @@ def _can_continue_reading(previous, current, metrics):
                     and b[1] < a[3] and .7 < width_b / max(width_a, 1) < 1.45)
     return bool(current['page'] == previous['page'] + 1 and same_column
                 and page_height and a[3] > page_height * .65 and b[1] < next_height * .23)
+
+
+def _can_continue_numeric(previous, current, role):
+    """Join an immediately wrapped scalar after a prose/caption equals sign.
+
+    The same page, left edge, font and normal line gap distinguish a caption
+    continuation from nearby graph ticks. Do not infer missing digits or units.
+    """
+    if previous is None or previous.get('reading_role') not in {'body', 'caption'}:
+        return False
+    if role not in {'body', 'layout_fragment', 'equation_fragment'} or current.get('source_role_hint') == 'marginal':
+        return False
+    if _document_page(previous) != _document_page(current) or not previous.get('reading_text', '').rstrip().endswith('='):
+        return False
+    if not re.fullmatch(r'\s*[+−-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+−-]?\d+)?\s*%?[.,;]?\s*', current['text']):
+        return False
+    a, b = previous.get('bbox'), current.get('bbox')
+    if not a or not b or not previous.get('lines') or not current.get('lines'):
+        return False
+    if previous.get('grouping_notes') or current.get('grouping_notes'):
+        return False
+    size, next_size = _reading_font(previous), _reading_font(current)
+    if abs(size - next_size) > max(.7, size * .10):
+        return False
+    return (abs(a[0] - b[0]) <= size * .7 and a[3] <= b[1] <= a[3] + size * 1.25
+            and 0 < b[3] - b[1] <= size * 1.7)
 
 
 def apply_reading_layer(source):
@@ -281,6 +340,10 @@ def apply_reading_layer(source):
               and block['bbox'][3] < abstract_tops[_document_page(block)]
               and len(block['text'].split()) < 25 and _reading_font(block) > body_sizes[document] * 1.04):
             role, included, reason = 'author_metadata', False, '论文标题与首段正文之间的短署名文字，另列文献信息。'
+        numeric_continuation = included and _can_continue_numeric(previous, block, role)
+        if numeric_continuation:
+            role = previous['reading_role']
+            reason = '等号后的独立数值与前文同页、同列、同字号且紧邻下一行，作为原句续行保留；未改数值或补写单位。'
         text, edits, notes = clean_reading_text(block['text'], words, compounds,
                                                prose=role not in {'equation_fragment', 'layout_fragment'})
         notes = list(dict.fromkeys(list(block.get('grouping_notes', [])) + notes))
@@ -308,7 +371,7 @@ def apply_reading_layer(source):
             # Page furniture can interrupt the physical block list, but does
             # not interrupt a supported page/column continuation.
             continue
-        continuation = previous is not None and _can_continue_reading(previous, block, metrics)
+        continuation = numeric_continuation or (previous is not None and _can_continue_reading(previous, block, metrics))
         group, joined_from, skipped_fragments = previous_group, previous, []
         if not continuation and role == 'body':
             # Inline formula glyphs may be emitted before a wrapped word's
@@ -332,7 +395,8 @@ def apply_reading_layer(source):
             group['source_ids'].append(block['id'])
             group['pages'] = list(dict.fromkeys(group['pages'] + [block['page']]))
             group['reading_notes'] = list(dict.fromkeys(group['reading_notes'] + notes + join_notes))
-            group.setdefault('joins', []).append({'from': joined_from['id'], 'to': block['id'], 'basis': 'unfinished_sentence_and_matching_layout', 'edits': join_edits})
+            basis = 'numeric_continuation_after_equals_and_matching_layout' if numeric_continuation else 'unfinished_sentence_and_matching_layout'
+            group.setdefault('joins', []).append({'from': joined_from['id'], 'to': block['id'], 'basis': basis, 'edits': join_edits})
             if skipped_fragments:
                 group.setdefault('linked_layout_source_ids', []).extend(skipped_fragments)
                 group['reading_notes'].append('断词之间的独立公式字形仍保留在版面片段索引，未据此重构公式。')

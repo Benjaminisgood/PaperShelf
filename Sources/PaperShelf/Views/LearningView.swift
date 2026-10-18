@@ -67,13 +67,22 @@ struct LearningView: View {
                 if ["failed", "cancelled", "interrupted"].contains(run.status ?? "") {
                     HStack {
                         Text("\(run.statusLabel) · 已保存来源与日志").font(.caption).foregroundStyle(.orange)
-                        Button("续跑生成") { learning.generate(reference, supplements: supplements, bookJSON: book ? bookJSON : nil, resumeFrom: run.directory) }
-                            .disabled(learning.busy)
-                            .help("仅当原文、字段、模型和分块配置一致时复用已合格的分块；否则请重新生成。")
+                        if run.revisionOf != nil {
+                            Button("重新校订") { selectedRun = nil; learning.revise(run, reference: reference, retry: true) }
+                                .disabled(learning.busy)
+                                .help("从校订前的已完成资料重新生成新版本，失败记录仍保留。")
+                        } else {
+                            Button("续跑生成") { learning.generate(reference, supplements: supplements, bookJSON: book ? bookJSON : nil, resumeFrom: run.directory) }
+                                .disabled(learning.busy)
+                                .help("仅当原文、字段、模型和分块配置一致时复用已合格的分块；否则请重新生成。")
+                        }
                     }
                 }
                 if run.status == "partial" { Text("部分集成未完成，请查看处理提示。").font(.caption).foregroundStyle(.orange) }
                 HStack {
+                    Button("AI 校订正文") { selectedRun = nil; learning.revise(run, reference: reference) }
+                        .disabled(learning.busy || !["completed", "partial"].contains(run.status ?? "completed"))
+                        .help("使用当前模型对照原文整理全文与中文译述，另存版本，保留原资料和字段。")
                     Button("校对字段") { reviewing = true }.disabled(learning.busy || run.artifacts["extraction"] == nil)
                     Button("浏览图谱") { graphing = true }.disabled(learning.graphPath(for: run) == nil)
                 }

@@ -64,6 +64,7 @@
 | `layout-fragments.md` | 有片段时生成；完整保留暂不能安全重组为正文的公式、符号和图表文字，并链接原始来源 |
 | `learning.html / learning.md` | 中文主题学习资料，保留公式、图表、自测和来源入口 |
 | `paragraphs.md` | 可单独阅读的逐段对照 |
+| `reading-content.md` | 原语言清洁正文与来源 ID，供知识提取使用；不混入界面、校订日志或处理提示 |
 | `extraction.json / dataset.csv / dataset.tsv` | 自定义条件记录、字段值及证据；审阅历史保存在 JSON 中 |
 | `evidence-graph.json / agent/` | 本地证据关系及可独立运行的阅读 Agent |
 
@@ -78,6 +79,16 @@ AI 原语言清洁用于阅读，不能成为改写原始引文的依据。自�
 长段译述可采用稳定的 `translation_units`，逐项要求完整译述，再合成为段落。主线研读负责组织主题；逐段对照与原语言全文负责覆盖。原始块与被归入附属来源的内容均可访问，不把页码、版权或空白标记强行解释为科学结论。流程诊断单独保留，不能将“本分块没有实验内容”写成整篇论文的研究缺失。
 
 ## 内容审阅与可追溯修正
+
+应用中的 **AI 校订正文** 使用当前模型，对已完成的资料另存新版本。CLI 对应：
+
+```sh
+python -m papershelf_pipeline revise --manifest /absolute/run/manifest.json
+```
+
+校订独立执行完整原语言重排与逐句中文直译，再对照 canonical 原文重新组织主题。原句中的变量定义、数值、条件和论断强度必须保留；英文明确断词如 `challen-ging` 可以修复，数学符号疑点必须记录。正文中的重复页眉、版权和仓储封面保留在来源索引，独立公式和图轴保留在版面附录。旧版本不覆盖，自定义字段及其证据不经生成模型改写。旧译述和整理稿保存在新版本 `draft/`，校订前后稿及每次模型响应可追溯。源文件改变时拒绝混用版本；失败或取消保留状态与已完成响应。
+
+`--provider-config` 可选择无密钥的当前服务配置。`--editorial-corrections` 可提供独立核验记录：绑定原 PDF SHA256、来源 ID、实际页图 SHA256、审阅者和核验方法；公式修正保留前后值，正文修正只匹配精确旧值。核验过的公式按原文位置重新进入全文 MD，未可靠重建的公式保留原始证据，不以乱码冒充可读 LaTeX。新版本的 Graphiti/Paper2Agent 回执仍明确引用之前的独立任务，不隐式重写远端知识库或重复执行科学工具。
 
 复核后可在请求提供 `review_corrections_path`（精确原值/新值/原因/来源 ID）和 `layout_observations_path`（原 PDF SHA256/来源 ID/原版面观察/核验记录）。前者修改讲解文字、逐句译述或公式及符号解释，保存 `chunks/*-before-review.json` 与 `learning-review.json`；后者把经独立核验的提取误差或原文冲突显式提供给生成器。字段事实使用独立的 `extraction_corrections_path`：每项须有 paper、source_sha256、record_id、field、完整 original/corrected 单元格、reason、actor；源文件及原值匹配后再次严格核验类型与逐字引文/页码，并通过既有数据集审阅机制保留哈希审计链。它在所有导出和 Agent 生成前应用，保存 `extraction-before-review.json`、`extraction-review.json`，明确不代表研究者科学验收。旧运行不会被覆写，未核验图像不得被称作已阅读。
 

@@ -161,6 +161,31 @@ final class LearningStore: ObservableObject {
         }
     }
 
+    func revise(_ run: LearningRun, reference: Reference, retry: Bool = false) {
+        guard !busy else { return }
+        busy = true; error = nil; answer = ""
+        var configuration = settings
+        configuration.mode = "llm"
+        configuration.pythonPath = pythonPath; configuration.backendPath = backendPath
+        operation = Task {
+            defer { recoverHistory(); busy = false; client = nil; operation = nil; startNext() }
+            do {
+                guard persistenceAvailable else { throw LearningError.message("研读历史损坏，已停止写入；请先检查 history.json。") }
+                let url = try PDFLinks.resolvedURL(for: reference)
+                let scope = url.startAccessingSecurityScopedResource()
+                defer { if scope { url.stopAccessingSecurityScopedResource() } }
+                let work = try workDirectory()
+                let provider = work.appendingPathComponent("provider.json")
+                try JSONSerialization.data(withJSONObject: providerConfiguration(configuration), options: [.prettyPrinted, .sortedKeys]).write(to: provider, options: .atomic)
+                progress = "正在对照原文校订正文与译述…"
+                let manifest = retry ? (run.revisionOf ?? run.manifestPath) : run.manifestPath
+                _ = try await invoke(["revise", "--manifest", manifest, "--provider-config", provider.path], work: work, configuration: configuration)
+                progress = "AI 校订已另存新版本，原资料与字段保持可追溯。"
+            } catch is CancellationError { progress = "校订已取消，原版本保留。" }
+            catch { self.error = error.localizedDescription; progress = "校订未完成；原版本和处理记录保留。" }
+        }
+    }
+
     func chooseSource(for reference: Reference) {
         let panel = NSOpenPanel(); panel.title = "选择用于研读的 PDF、Markdown、Word 或其他文档"
         guard panel.runModal() == .OK, let url = panel.url else { return }

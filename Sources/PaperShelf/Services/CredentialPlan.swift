@@ -44,7 +44,7 @@ struct CredentialPlan {
             }
             requests.append(Lookup(environment: environment, secret: secret))
         }
-        let providerNeeded = (["run", "agent"].contains(command) && mode == "llm") || command.hasPrefix("provider-")
+        let providerNeeded = (["run", "revise", "agent"].contains(command) && mode == "llm") || command.hasPrefix("provider-")
             || (requiresGraphModel && graphKey == providerKeyEnvironment)
             || (requiresEmbedding && embeddingKey == providerKeyEnvironment)
         if providerNeeded { try add(providerKeyEnvironment, .provider) }

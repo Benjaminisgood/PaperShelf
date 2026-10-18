@@ -52,4 +52,14 @@ final class LearningModelsTests: XCTestCase {
         let interrupted = Data("{\"run_id\":\"run\",\"reference_id\":\"paper\",\"status\":\"running\"}".utf8)
         XCTAssertEqual(try LearningRun.recover(manifest: interrupted, directory: URL(fileURLWithPath: "/tmp/run"))?.status, "interrupted")
     }
+    func testRevisionHistoryRetainsOriginalForRetry() throws {
+        let data = Data("""
+        {"run_id":"revision","reference_id":"paper","status":"completed","mode":"llm","revision_of":"/original/manifest.json"}
+        """.utf8)
+        let run = try XCTUnwrap(LearningRun.recover(manifest: data, directory: URL(fileURLWithPath: "/revision")))
+        XCTAssertEqual(run.revisionOf, "/original/manifest.json")
+        XCTAssertEqual(run.statusLabel, "AI 校订")
+        let restored = try JSONDecoder().decode(LearningRun.self, from: JSONEncoder().encode(run))
+        XCTAssertEqual(restored.revisionOf, run.revisionOf)
+    }
 }

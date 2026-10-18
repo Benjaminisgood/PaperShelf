@@ -343,3 +343,12 @@
 "颜色" = "Color";
 "默认按 PDF 一级书签分章。没有书签时填写 chapters 数组，每章含 title、start_page、end_page，并完整覆盖所有页。" = "By default, chapters follow top-level PDF bookmarks. If none exist, provide a chapters array with title, start_page, and end_page for each chapter, covering every page.";
 "默认颜色" = "Default color";
+"AI 校订正文" = "Revise with AI";
+"AI 校订" = "AI revision";
+"重新校订" = "Retry revision";
+"从校订前的已完成资料重新生成新版本，失败记录仍保留。" = "Create a new edition from the completed version before revision. The failed attempt is preserved.";
+"使用当前模型对照原文整理全文与中文译述，另存版本，保留原资料和字段。" = "Use the current model to revise the full text and Chinese translation against the source. Save a new edition while preserving earlier materials and fields.";
+"来源对照" = "Source comparison";
+"原始提取 MD" = "Raw extraction MD";
+"逐块来源索引" = "Source index";
+"逐段译述记录" = "Paragraph translation";

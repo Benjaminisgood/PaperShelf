@@ -75,13 +75,14 @@ public struct LearningRun: Codable, Identifiable, Sendable {
     public var warnings: [String]
     public var mode: String
     public var status: String?
+    public var revisionOf: String?
     public var statusLabel: String {
         switch status {
         case "failed": return "失败"
         case "cancelled": return "已取消"
         case "interrupted", "running": return "未完成"
         case "partial": return "部分完成"
-        default: return mode == "offline" ? "草稿" : "AI 精读"
+        default: return mode == "offline" ? "草稿" : (revisionOf == nil ? "AI 精读" : "AI 校订")
         }
     }
 
@@ -101,6 +102,7 @@ public struct LearningRun: Codable, Identifiable, Sendable {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let text = value["created_at"] as? String, let date = formatter.date(from: text) { run.createdAt = date }
+        run.revisionOf = value["revision_of"] as? String
         return run
     }
     public init(referenceID: String, title: String, runID: String, directory: String, manifestPath: String, artifacts: [String: String], warnings: [String], mode: String, status: String = "completed") {

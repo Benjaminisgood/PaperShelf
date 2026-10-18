@@ -7,8 +7,8 @@ import unittest
 from pathlib import Path
 
 from papershelf_pipeline.contracts import PipelineError
-from papershelf_pipeline.generation import make_learning
-from papershelf_pipeline.synthesis import reading_groups, validate_reading, consolidate_learning, separate_process_notes
+from papershelf_pipeline.generation import make_learning, canonicalize_evidence, translation_units, validate_paragraph
+from papershelf_pipeline.synthesis import reading_groups, validate_reading, consolidate_learning, separate_process_notes, polish_reading, polish_translation_units, quarantine_equations, refresh_grounded_frontmatter, sentence_parts
 from test_pipeline import chunk_response
 
 
@@ -81,6 +81,197 @@ class SynthesisTests(unittest.TestCase):
         self.assertEqual(len(value['gaps']),2)
         self.assertEqual(len(value['process_notes']),1)
 
+    def test_consolidation_can_correct_a_wrong_citation_with_verifiable_evidence(self):
+        learning={'findings':[{'title':'速率参数','body':'草稿挂错来源。','source_ids':['p1-b1'],'kind':'source'}]}
+        class Provider:
+            def json(inner,system,prompt):
+                request=json.loads(prompt);output=chunk_response(request)
+                if 'items' in request:
+                    output['findings'][0]['source_ids']=['p1-b2']
+                    output['findings'][0]['body']='速率常数为2 s^-1。'
+                    output['coverage'][0]['citation_correction']={'original_source_ids':['p1-b1'],'corrected_source_ids':['p1-b2'],'reason':'原引用仅含温度；第二段明确给出速率常数。','evidence':[{'block_id':'p1-b2','page':1,'quote':self.blocks[1]['text']}]}
+                return output
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'chunks').mkdir()
+            consolidate_learning(learning,self.source,Provider(),root,lambda _:None)
+        self.assertEqual(learning['consolidated']['findings'][0]['source_ids'],['p1-b2'])
+        correction=learning['consolidation_review']['coverage'][0]['citation_correction']
+        self.assertEqual(correction['original_source_ids'],['p1-b1'])
+        self.assertEqual(correction['evidence'][0]['quote'],self.blocks[1]['text'])
+
+    def test_grounded_gap_review_resolves_later_provided_evidence_without_losing_draft(self):
+        learning={'overview':'旧概览','reading_route':['旧路线'],'gaps':['局部草稿声称未报告速率常数。']}
+        class Provider:
+            def json(inner,system,prompt):
+                request=json.loads(prompt);output=chunk_response(request)
+                output['reviewed_gaps']=[{'input_gap_id':'gap-001','text':'速率常数在后文明确给出。','source_ids':['p1-b2'],'status':'resolved','reason':'第二段报告2 s^-1，不能保留局部缺失声明。'}]
+                return output
+        with tempfile.TemporaryDirectory() as folder:
+            refresh_grounded_frontmatter(learning,self.source,Provider(),Path(folder),lambda _:None)
+        self.assertEqual(learning['gaps'],[])
+        self.assertEqual(learning['gaps_drafts'],['局部草稿声称未报告速率常数。'])
+        self.assertEqual(learning['reviewed_gaps'][0]['source_ids'],['p1-b2'])
+
+    def test_scientific_sentence_splitter_keeps_references_and_all_characters(self):
+        text='Typical loss curves are presented in Fig. S1. The law follows Eq. A. Dr. Smith et al. Report it as No. A, e.g. Data from Fig. 7b. Next we compare the methods.'
+        parts=sentence_parts(text)
+        self.assertEqual(''.join(parts),text)
+        self.assertIn('Fig. S1.',parts[0])
+        self.assertFalse(any(part.strip()=='S1.' for part in parts))
+        self.assertTrue(any(part.strip().startswith('Next') for part in parts))
+        self.assertTrue(any('Dr. Smith et al. Report' in part for part in parts))
+
+    def test_cached_abbreviation_units_merge_only_with_proven_reference_coverage(self):
+        text=('We compare the methods using fully preserved measurements and independent validation conditions. '*7+'Typical loss curves are presented in Fig. S1. The training converges after all experiments are processed.')
+        block={'id':'p13-g171','page':13,'text':text}
+        old=translation_units(block,legacy_sentence_boundaries=True)
+        actual=[{'unit_id':unit['id'],'translation':'完整译文：'+unit['text']} for unit in old]
+        split=next(i for i,unit in enumerate(old) if unit['text'].strip()=='S1.')
+        actual[split-1]['translation']='典型损失曲线见图 S1。'
+        actual[split]['translation']=''
+        paragraph={'source_id':block['id'],'explanation':'','translation_units':actual,'key_sentence':''}
+        validate_paragraph(paragraph,block)
+        self.assertTrue(paragraph['translation_units_original'])
+        self.assertEqual(len(paragraph['translation_units']),len(translation_units(block)))
+        bad={'source_id':block['id'],'explanation':'','translation_units':copy.deepcopy(actual),'key_sentence':''}
+        bad['translation_units'][split-1]['translation']='典型损失曲线见图。'
+        with self.assertRaises(PipelineError):validate_paragraph(bad,block)
+
+    def test_recorded_reading_quote_restores_exact_raw_without_accepting_arbitrary_text(self):
+        from papershelf_pipeline.reading import clean_reading_text
+        raw='The reaction converts triglyceride (TG) molecules into methyl ester mole-\ncules.'
+        reading,edits,notes=clean_reading_text(raw,{'molecules':1},{})
+        block={'id':'p6-g226','page':6,'text':raw,'reading_text':reading,'reading_edits':edits,'reading_role':'body'}
+        evidence={'block_id':block['id'],'page':6,'quote':'triglyceride (TG) molecules into methyl ester molecules'}
+        canonicalize_evidence(evidence,block)
+        self.assertEqual(evidence['quote'],raw)
+        self.assertIn('original_quote',evidence)
+        false_projection={**block,'reading_text':'A fabricated temperature of 100 K was measured.'}
+        fabricated={'block_id':block['id'],'page':6,'quote':false_projection['reading_text']}
+        canonicalize_evidence(fabricated,false_projection)
+        self.assertNotEqual(fabricated['quote'],raw)
+        self.assertNotIn('quote_correction_reason',fabricated)
+
+    def test_grounded_overview_and_figures_keep_raw_sources_and_drafts(self):
+        source=copy.deepcopy(self.source)
+        source['editorial_review_context']={'source_sha256':'fixture-hash','notes':['保留原文条件。']}
+        figure={'label':'Figure 1','reading':'旧图表草稿。','source_ids':['p1-b1','p1-b2'],'page':1}
+        learning={'overview':'旧概览夸大了结果。','reading_route':['旧路线。'],'figures_tables':[figure]}
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt);calls.append(request)
+                output=chunk_response(request)
+                if 'figure_drafts' in request:
+                    output['figures_tables'][0]['reading']='依据原文说明条件与速率关系；未提供图像，不能独立确认视觉细节。'
+                return output
+        with tempfile.TemporaryDirectory() as folder:
+            refresh_grounded_frontmatter(learning,source,Provider(),Path(folder),lambda _:None)
+            self.assertTrue((Path(folder)/'chunks/grounded-overview.json').is_file())
+            self.assertTrue((Path(folder)/'chunks/grounded-figures-001.json').is_file())
+        self.assertEqual([b['text'] for b in calls[0]['source_evidence']],[b['text'] for b in source['blocks']])
+        self.assertEqual(calls[0]['editorial_review_context'],source['editorial_review_context'])
+        self.assertEqual(learning['overview_draft'],'旧概览夸大了结果。')
+        self.assertEqual(learning['figures_tables_drafts'],[figure])
+        self.assertEqual(learning['figures_tables'][0]['source_ids'],figure['source_ids'])
+        self.assertEqual(learning['figures_tables'][0]['page'],1)
+        self.assertIn('未提供图像',learning['figures_tables'][0]['reading'])
+
+    def test_pdf_math_glyphs_are_quarantined_with_complete_evidence(self):
+        corrupt={'label':'8','latex':'log pðDjyÞ / 1','meaning':'旧PDF提取式','symbols':[{'symbol':'p','meaning':'概率'}], 'source_ids':['p1-b1','p1-b2']}
+        trusted={'label':'1','latex':r'\frac{dY}{dt}=S r(Y)','meaning':'浓度变化率','symbols':[{'symbol':'Y','meaning':'浓度'}], 'source_ids':['p1-b2']}
+        learning={'equations':[copy.deepcopy(corrupt),copy.deepcopy(trusted)]}
+        self.assertEqual(quarantine_equations(learning,self.source),1)
+        self.assertEqual(learning['equations'],[trusted])
+        unresolved=learning['unresolved_equations'][0]
+        self.assertEqual(unresolved['latex'],corrupt['latex'])
+        self.assertEqual(unresolved['source_ids'],corrupt['source_ids'])
+        self.assertEqual([item['text'] for item in unresolved['source_text']],[block['text'] for block in self.blocks[:2]])
+        self.assertEqual(unresolved['reconstruction_status'],'unresolved')
+        invalid={'equations':[{**corrupt,'source_ids':['invented']}]}
+        self.assertEqual(quarantine_equations(invalid,self.source),0)
+        self.assertEqual(len(invalid['equations']),1)
+
+    def test_verified_cross_chunk_conflict_gets_both_canonical_evidence_texts(self):
+        text='The model describes the reaction and must be checked against measurements. '*28
+        blocks=[{'id':f'p{i}-b1','page':i,'text':text,'reading_role':'body'} for i in (1,2)]
+        main=[{'id':b['id'],'source_ids':[b['id']],'text':b['text'],'kind':'body','page':b['page'],'pages':[b['page']]} for b in blocks]
+        note={'kind':'source_conflict','source_ids':['p1-b1','p2-b1'],'observation':'图注与下一页正文顺序存在冲突，须并列核对。'}
+        source={'path':'paper.pdf','blocks':blocks,'reading_main_blocks':main,'layout_observations':[note]}
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt);calls.append(request)
+                if any(key in request for key in ('source_blocks','reading_groups','items')):
+                    output=chunk_response(request)
+                    if 'source_blocks' in request:
+                        output['critique'][0]['source_ids']=['p1-b1','p2-b1']
+                    return output
+                return chunk_response(request)
+        with tempfile.TemporaryDirectory() as folder:
+            learning,_=make_learning(source,{'mode':'llm','fields':[],'chunk_characters':2000},Path(folder),Provider(),lambda _:None)
+        first=calls[0]
+        self.assertEqual(len(first['source_blocks']),1)
+        self.assertEqual([b['id'] for b in first['evidence_blocks']],['p1-b1','p2-b1'])
+        self.assertEqual(first['verified_layout_observations'],[note])
+        self.assertEqual(learning['reading_coverage']['canonical_blocks'],2)
+        self.assertEqual(learning['reading_coverage']['auxiliary_source_ids'],[])
+
+    def test_consolidation_receives_complete_deduplicated_canonical_evidence(self):
+        source=copy.deepcopy(self.source)
+        source['blocks'][0]['text']='RAW scientific evidence with original line breaks.\n'*700+'UNIQUE END OF RAW EVIDENCE'
+        unrelated={'source_ids':['p1-b4'],'observation':'Unrelated publisher note.'}
+        source['layout_observations'].append(unrelated)
+        learning={'thematic_sections':copy.deepcopy(self.reading['thematic_sections']), 'methods':[{'title':'条件','body':'完整保留条件。','source_ids':['p1-b1','p1-b3'],'kind':'source'}]}
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt); calls.append((system,request))
+                return chunk_response(request)
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'chunks').mkdir()
+            consolidate_learning(learning,source,Provider(),root,lambda _:None)
+        system,request=calls[0]
+        self.assertNotIn('source_blocks',request)
+        self.assertEqual([b['id'] for b in request['source_evidence']],['p1-b1','p1-b2','p1-b3','p1-b4'])
+        self.assertEqual(request['source_evidence'][0]['text'],source['blocks'][0]['text'])
+        self.assertTrue(request['source_evidence'][0]['text'].endswith('UNIQUE END OF RAW EVIDENCE'))
+        self.assertEqual(request['verified_layout_observations'],source['layout_observations'])
+        self.assertIn('addresses the curse of dimensionality',system)
+        self.assertIn('to improve generalizability',system)
+        self.assertIn('may/could/potential',system)
+        self.assertEqual(learning['consolidation_review']['source_evidence_contract'],'canonical-fulltext-v1')
+
+    def test_dedicated_bilingual_polish_repairs_words_and_replaces_summary_translation(self):
+        text=('The model is designed to improve predict-ability under challen-ging conditions. '
+              'In this equation, Y(t) is the species concentration vector, whereas its derivative is the rate of change in concentration. '
+              'A is the pre-exponential factor, T is absolute temperature, b is the temperature exponent, Ea is activation energy, and R is the gas constant.')
+        group={'id':'p3-g63','source_ids':['p3-g63'],'text':text,'kind':'body','page':3,'pages':[3]}
+        raw=text.replace('predict-ability','predict-\nability').replace('challen-ging','challen-\nging')
+        source={'blocks':[{'id':group['id'],'page':3,'text':raw}], 'reading_main_blocks':[group]}
+        draft={'source_id':group['id'],'explanation':'定义参数并说明方程。'}
+        learning={'paragraphs':[draft], 'clean_reading':[]}
+        translations=['该模型的设计旨在改善困难条件下的预测能力。', '在该方程中，Y(t)是物种浓度向量，其导数则是浓度的变化速率。', 'A是指前因子，T是绝对温度，b是温度指数，Ea是活化能，R是气体常数。']
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt);calls.append(request)
+                units=request['reading_groups'][0]['translation_units']
+                return {'clean_reading':[{'id':group['id'],'source_ids':group['source_ids'],'text':text.replace('predict-ability','predictability').replace('challen-ging','challenging'), 'translation':'', 'translation_units':[{'unit_id':unit['id'], 'translation':('本段介绍模型的用途。' if len(calls)==1 and i==0 else translations[i])} for i,unit in enumerate(units)], 'editing_notes':['修复确定的英文词内断行。']}]}
+        with tempfile.TemporaryDirectory() as folder:
+            polished=polish_reading(source,learning,Provider(),Path(folder),lambda _:None)
+            self.assertTrue((Path(folder)/'chunks/polish-0001-invalid-1.json').is_file())
+        self.assertEqual(len(calls),2)
+        self.assertEqual(calls[0]['source_evidence'][0]['text'],raw)
+        self.assertEqual(set(calls[0]['schema']),{'clean_reading'})
+        self.assertEqual(''.join(unit['text'] for unit in polish_translation_units(group)),text)
+        self.assertIn('predictability',polished[0]['text'])
+        self.assertNotIn('predict-ability',polished[0]['text'])
+        self.assertEqual(learning['paragraphs_drafts'],[draft])
+        self.assertEqual(learning['paragraphs'][0]['explanation'],'\n\n'.join(translations))
+        self.assertEqual(learning['paragraphs'][0]['key_sentence'],'')
+        self.assertFalse(learning['reading_polish_review']['human_scientific_acceptance'])
+
     def test_raw_evidence_cannot_override_clean_paragraph_anchor(self):
         # The real CRNN extraction contains punctuation whitespace that the
         # reading layer removes. The same ID must never expose two anchors or
@@ -94,7 +285,7 @@ class SynthesisTests(unittest.TestCase):
         class Provider:
             def json(self,system,prompt):
                 request=json.loads(prompt); calls.append(request)
-                if 'source_blocks' in request or 'items' in request:
+                if 'source_blocks' in request or 'items' in request or 'reading_groups' in request:
                     output=chunk_response(request)
                     if 'source_blocks' in request:
                         # This simulates the observed model selecting the last
@@ -104,10 +295,10 @@ class SynthesisTests(unittest.TestCase):
                         for paragraph in output['paragraphs']:
                             paragraph['source_anchor']=anchors[paragraph['source_id']]
                     return output
-                return {'overview':'先核对模型假设与适用条件。','reading_route':['按研究问题组织原文证据。']}
+                return chunk_response(request)
         with tempfile.TemporaryDirectory() as folder:
             learning,_=make_learning(source,{'mode':'llm','fields':[]},Path(folder),Provider(),lambda _:None)
-        self.assertEqual(len(calls),3)
+        self.assertEqual(len(calls),5)
         first=calls[0]
         self.assertEqual(first['source_blocks'][0]['source_anchor'],clean[:96])
         self.assertTrue(first['source_blocks'][0]['translation_units'])
@@ -130,7 +321,7 @@ class SynthesisTests(unittest.TestCase):
                         output['equations'][0]['source_ids']=['p1-b3']
                         output['thematic_sections'][0]['paragraphs'][0]['source_ids']=['p1-b1','p1-b2']
                     return output
-                return {'overview':'先核对条件，再理解速率模型。','reading_route':['条件、机制与证据依次核对。']}
+                return chunk_response(request)
         with tempfile.TemporaryDirectory() as folder:
             learning,_=make_learning(source,{'mode':'llm','fields':[],'chunk_characters':5000},Path(folder),Provider(),lambda _:None)
         first=calls[0]

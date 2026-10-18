@@ -185,6 +185,81 @@ class ReadingLayerTests(unittest.TestCase):
         self.assertFalse(result['reading_main_blocks'])
         self.assertEqual(len(result['reading_fragments']), 2)
 
+    def test_standalone_equations_and_reactions_keep_all_symbols_out_of_prose(self):
+        expressions = ['pðyjDÞ ¼ pðDjyÞpðyÞ', 'qðyjYÞ log qðyjYÞ', 'Y? ¼ arg min',
+                       'TG þ ROH!', 'kr ES !', 'S + MAP3K →S + MAP3K ∗',
+                       'MAP3K\x04 þ MAP2K! MAP3K\x04 þ MAP2K\x04',
+                       'Loss = MAE(Y(t), Ydata(t)) (8)', 'y = ODESolve(CRNN(Y), Y0) (7)']
+        result = apply_reading_layer(source(*[block(str(i), text) for i, text in enumerate(expressions)]))
+        self.assertFalse(result['reading_main_blocks'])
+        self.assertFalse(result['reading_excluded'])
+        self.assertEqual([b['text'] for b in result['blocks']], expressions)
+        self.assertEqual([g['source_ids'] for g in result['reading_fragments']], [[str(i)] for i in range(len(expressions))])
+        self.assertTrue(all(g['kind'] == 'equation_fragment' for g in result['reading_fragments']))
+        self.assertIn('¼', result['reading_fragments'][0]['text'])
+        self.assertIn('⟦U+0004⟧', result['reading_fragments'][6]['text'])
+
+    def test_explanatory_math_sentences_and_exclamations_remain_main(self):
+        sentences = ['The temperature was T = 300 K.', 'where r = k[A] describes the reaction rate.',
+                     'L(y) = log p(y), where y is the position variable.', 'We consider A → B.',
+                     'No CO!', 'CO formed!', 'Conversion reached 95%!', '反应速率为 r = k[A]。']
+        result = apply_reading_layer(source(*[block(str(i), text, box=(40, 100 + i * 45, 280, 130 + i * 45)) for i, text in enumerate(sentences)]))
+        self.assertEqual([g['text'] for g in result['reading_main_blocks']], sentences)
+        self.assertFalse(result['reading_fragments'])
+        self.assertFalse(result['reading_excluded'])
+
+    def test_display_formula_does_not_join_following_explanation(self):
+        result = apply_reading_layer(source(block('eq', 'LðyÞ ¼ logðpðDjyÞpðyÞÞ;', box=(40, 100, 280, 115)),
+                                            block('explain', 'where y is the position of the particle.', box=(40, 116, 280, 140))))
+        self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['explain']])
+        self.assertEqual([g['source_ids'] for g in result['reading_fragments']], [['eq']])
+
+    def test_caption_scalar_continuation_after_equals_retains_both_source_ids(self):
+        caption = block('caption', 'Figure 5. Learned weights after pruning with threshold =\n',
+                        box=(54.72, 368.44, 552.91, 402.36), size=12)
+        value = block('value', '0.01.\n', box=(54.72, 409.86, 81.74, 423.14), size=12)
+        original = source(caption, value)
+        raw = copy.deepcopy(original)
+        result = apply_reading_layer(original)
+        self.assertEqual(len(result['reading_main_blocks']), 1)
+        self.assertFalse(result['reading_fragments'])
+        joined = result['reading_main_blocks'][0]
+        self.assertEqual(joined['source_ids'], ['caption', 'value'])
+        self.assertEqual(joined['kind'], 'caption')
+        self.assertTrue(joined['text'].endswith('threshold = 0.01.'))
+        self.assertEqual(joined['joins'][0]['basis'], 'numeric_continuation_after_equals_and_matching_layout')
+        self.assertTrue(result['blocks'][1]['reading_main'])
+        self.assertEqual(result['blocks'][1]['reading_role'], 'caption')
+        self.assertEqual(result['raw_blocks'], raw['raw_blocks'])
+        self.assertEqual([b['text'] for b in result['blocks']], [b['text'] for b in raw['blocks']])
+        self.assertEqual(apply_reading_layer(copy.deepcopy(result)), result)
+
+    def test_body_scalar_continuation_keeps_sign_exponent_and_percent(self):
+        for value in ('-1.2e-3.', '5%.'):
+            with self.subTest(value=value):
+                result = apply_reading_layer(source(block('body', 'The measured value =', box=(40, 100, 280, 120)),
+                                                    block('value', value, box=(40, 124, 90, 135))))
+                self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['body', 'value']])
+                self.assertTrue(result['reading_main_blocks'][0]['text'].endswith('= ' + value))
+
+    def test_axis_ticks_and_separate_numeric_blocks_do_not_merge_into_captions(self):
+        cases = [block('value', '0.01.', box=(70, 124, 100, 135)),
+                 block('value', '0.01.', box=(40, 160, 80, 172)),
+                 block('value', '0.01.', box=(40, 124, 80, 135), size=7),
+                 block('value', '0.01.', page=2, box=(40, 124, 80, 135)),
+                 block('value', '0.01.', box=(40, 124, 80, 135), document_id='s1'),
+                 block('value', '0.01.', box=(40, 124, 80, 135), source_role_hint='marginal'),
+                 block('value', '0.01 0.1 1', box=(40, 124, 80, 135))]
+        for value in cases:
+            with self.subTest(value=value):
+                result = apply_reading_layer(source(block('caption', 'Figure 1. Threshold =', box=(40, 100, 280, 120)), value))
+                self.assertEqual(result['reading_main_blocks'][0]['source_ids'], ['caption'])
+                self.assertTrue(any(g['source_ids'] == ['value'] for g in result['reading_fragments']))
+        result = apply_reading_layer(source(block('caption', 'Figure 1. Complete caption.', box=(40, 100, 280, 120)),
+                                           block('value', '0.01.', box=(40, 124, 80, 135))))
+        self.assertEqual(result['reading_main_blocks'][0]['source_ids'], ['caption'])
+        self.assertEqual(result['reading_fragments'][0]['source_ids'], ['value'])
+
     def test_attested_split_word_crosses_inline_formula_fragments_without_losing_them(self):
         result = apply_reading_layer(source(
             block('word', 'A chemical reaction is explicitly named here.', box=(40, 40, 280, 60)),

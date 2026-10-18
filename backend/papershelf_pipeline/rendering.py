@@ -150,6 +150,14 @@ def render_guide(source: dict, learning: dict, extraction: dict, run_dir: Path, 
         md.extend([f'### {equation.get("label", "公式")}', '', '$$\n'+equation['latex']+'\n$$', equation.get('meaning',''), *[f'- {symbol.get("symbol", "")}：{symbol.get("meaning", "")}' for symbol in equation['symbols']], '来源：'+', '.join(equation['source_ids'])])
     if not learning['equations']:
         out.append('<p class="muted">没有经过生成并定位到来源的公式；请对照原版面。</p>')
+    if learning.get('unresolved_equations'):
+        out.append('<details class="callout warning"><summary>待核对的公式原文</summary><p>以下提取含未识别字形，尚未可靠重建。保留提取文本和来源，供对照原页。</p>')
+        md.extend(['', '<details><summary>待核对的公式原文</summary>', ''])
+        for equation in learning['unresolved_equations']:
+            out.append('<h3>' + esc(equation.get('label', '公式')) + '</h3><pre style="white-space:pre-wrap">' + esc(equation.get('latex', '')) + '</pre><p>' + esc(equation.get('reason', '需对照原页重建。')) + '</p>' + refs(equation['source_ids'], blocks))
+            md.extend(['### ' + equation.get('label', '公式'), '', '```text', equation.get('latex', ''), '```', '', equation.get('reason', '需对照原页重建。'), '来源：' + ', '.join(equation['source_ids']), ''])
+        out.append('</details>')
+        md.extend(['</details>', ''])
     out.append('</section><section id="calculations"><h2>关键数字复算与交互探索</h2><p class="meta">使用原文数值代入明确算式，单位换算必须写在算式中。交互仅执行下列固定算式，不运行模型生成的代码；改动输入属于条件探索。</p>')
     md.extend(['','## 关键数字复算与交互探索',''])
     for index,calculation in enumerate(learning.get('calculations',[]),1):

@@ -15,6 +15,10 @@ def main():
     subparsers = parser.add_subparsers(dest='command',required=True)
     run_parser = subparsers.add_parser('run',help='Generate a fresh, evidence-grounded learning package')
     run_parser.add_argument('--request',required=True)
+    revision = subparsers.add_parser('revise', help='Create a new AI-edited reading version while preserving the previous run')
+    revision.add_argument('--manifest', required=True)
+    revision.add_argument('--provider-config', help='Optional current provider configuration without credentials')
+    revision.add_argument('--editorial-corrections', help='Optional source and page-image SHA-bound editorial review bundle')
     agent = subparsers.add_parser('agent',help='Search or ask a generated paper agent; optionally serve MCP')
     agent.add_argument('--manifest',required=True)
     agent.add_argument('--query')
@@ -40,6 +44,11 @@ def main():
             if args.command == 'run':
                 from .pipeline import run
                 result = run(read_json(args.request))
+            elif args.command == 'revise':
+                from .revision import revise
+                config = read_json(args.provider_config) if args.provider_config else None
+                if config is not None: config = config.get('provider', config)
+                result = revise(args.manifest, config, editorial_corrections_path=args.editorial_corrections)
             elif args.command == 'agent':
                 if not args.query:
                     raise PipelineError('请提供 --query 或 --stdio。')

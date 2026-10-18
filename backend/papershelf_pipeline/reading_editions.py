@@ -21,16 +21,38 @@ def render_reading_editions(source: dict, learning: dict, directory: Path) -> di
               '[完整原始提取](source.md) · [逐块来源索引](source-index.md) · [中文研读](learning.md)', '']
     content = [f'# {learning["title"]}', '']
     document_id = None
-    for group in groups:
-        if group.get('reading_main') is False:
-            continue
-        identifiers = group.get('source_ids') or [group['id']]
-        first = next((blocks[item] for item in identifiers if item in blocks), group)
+    def ensure_document(identifiers):
+        nonlocal document_id
+        first = next((blocks[item] for item in identifiers if item in blocks), {})
         current_document = first.get('document_id', 'main')
         if current_document != document_id:
             if current_document != 'main':
                 output.extend(['## 补充材料：' + first.get('document', current_document), ''])
             document_id = current_document
+    positions = {identifier: index for index, identifier in enumerate(blocks)}
+    verified_equations = sorted(
+        (equation for equation in learning.get('equations', [])
+         if equation.get('editorial_verification') and equation.get('source_ids')
+         and all(identifier in blocks for identifier in equation['source_ids'])),
+        key=lambda equation: min(positions[i] for i in equation['source_ids']))
+
+    def append_equations_before(position):
+        while verified_equations and min(positions[i] for i in verified_equations[0]['source_ids']) < position:
+            equation = verified_equations.pop(0)
+            ensure_document(equation['source_ids'])
+            # Only a source/page-image reviewed transcription belongs in the
+            # original-language edition. Unresolved extraction stays in its appendix.
+            output.extend(['### ' + equation['label'], '', '$$\n' + equation['latex'] + '\n$$', '',
+                           '<details><summary>公式来源与核验记录</summary>', '', citations(equation['source_ids']), '',
+                           '对照原页转写；原式的符号疑点及解释见中文研读。', '', '</details>', ''])
+            content.extend(['<!-- source_ids: ' + ', '.join(equation['source_ids']) + ' -->',
+                            '$$\n' + equation['latex'] + '\n$$', ''])
+    for group in groups:
+        if group.get('reading_main') is False:
+            continue
+        identifiers = group.get('source_ids') or [group['id']]
+        append_equations_before(min((positions[i] for i in identifiers if i in positions), default=len(positions)))
+        ensure_document(identifiers)
         text = group.get('text', group.get('reading_text', ''))
         if not text.strip():
             continue
@@ -50,11 +72,10 @@ def render_reading_editions(source: dict, learning: dict, directory: Path) -> di
         notes.extend(note['observation'] for identifier in identifiers if identifier in blocks for note in blocks[identifier].get('layout_observations', []) if note.get('observation'))
         for note in dict.fromkeys(notes):
             output.append('- ' + str(note))
-        validation = group.get('validation')
-        if validation:
-            import json
-            output.extend(['', '校订检查：' + (validation if isinstance(validation, str) else json.dumps(validation, ensure_ascii=False))])
+        # Machine validation is retained in learning.json. Repeating the same
+        # technical receipt after every paragraph obscures the reading edition.
         output.extend(['', '</details>', ''])
+    append_equations_before(len(positions) + 1)
     excluded = [block for block in source['blocks'] if block.get('include_in_reading') is False]
     fragments = source.get('reading_fragments', [])
     if fragments:

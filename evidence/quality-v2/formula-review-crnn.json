@@ -1,0 +1,1051 @@
+{
+  "schema_version": "papershelf-formula-review-v1",
+  "paper": "crnn",
+  "source_path": "/Users/ben/Desktop/PaperShelf/Examples/2002.09062.pdf",
+  "source_sha256": "3f841ca660827c9292815f02b17f39c99466c4de9711ac6d546ed3a3a14003fc",
+  "reviewer": "Codex independent source-page formula review, 2026-10-18",
+  "reference_run": "20261017T222205Z-345266af12",
+  "reviewed_run": "20261018T053529Z-095e59baff",
+  "human_scientific_acceptance": false,
+  "review_method": "直接逐页目视复核当前PDF的完整原页图，并对照canonical来源文本及已有来源绑定layout observations；旧版公式仅作比较。B-CRNN页4另以Poppler 200 dpi复核，页9式24另以200 dpi局部复核。未把模型输出、技术测试或旧表直接视为科学验收。",
+  "equations": [
+    {
+      "id": "crnn-eq-1",
+      "equation": {
+        "label": "Eq. 1",
+        "latex": "v_{A} A + v_{B} B \\Rightarrow v_{C} C + v_{D} D",
+        "meaning": "基元化学反应方程式，表示反应物A和B转化为产物C和D。",
+        "symbols": [
+          {
+            "symbol": "v_A,v_B,v_C,v_D",
+            "meaning": "原文基元反应的化学计量系数；基元质量作用定律下反应物指数与其计量系数对应。"
+          },
+          {
+            "symbol": "A,B,C,D",
+            "meaning": "参与反应的物种。"
+          }
+        ],
+        "source_ids": [
+          "p4-g27",
+          "p4-g28"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g27",
+        "p4-g28"
+      ],
+      "replace_labels": [
+        "Eq. 1"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "80ecb07d8b927176f11827b0175ee3b32869d268a946e162bf578d4b1602a3c4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-2",
+      "equation": {
+        "label": "Eq. 2",
+        "latex": "r = k [A]^{v_{A}} [B]^{v_{B}} [C]^{0} [D]^{0}",
+        "meaning": "基于质量作用定律的反应速率表达式。",
+        "symbols": [
+          {
+            "symbol": "r",
+            "meaning": "该基元反应的反应速率。"
+          },
+          {
+            "symbol": "k",
+            "meaning": "速率常数。"
+          },
+          {
+            "symbol": "[A],[B],[C],[D]",
+            "meaning": "各物种浓度；非反应物C、D在此式指数为0。"
+          },
+          {
+            "symbol": "v_A,v_B",
+            "meaning": "反应物的反应级数，此基元反应中对应化学计量系数。"
+          }
+        ],
+        "source_ids": [
+          "p4-g27",
+          "p4-g29",
+          "p4-g30"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g27",
+        "p4-g29",
+        "p4-g30"
+      ],
+      "replace_labels": [
+        "Eq. 2"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "80ecb07d8b927176f11827b0175ee3b32869d268a946e162bf578d4b1602a3c4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-3",
+      "equation": {
+        "label": "Eq. 3",
+        "latex": "r = \\exp(\\ln k + v_{A} \\ln[A] + v_{B} \\ln[B] + 0 \\ln[C] + 0 \\ln[D])",
+        "meaning": "反应速率的对数线性化形式，便于映射到神经网络结构。",
+        "symbols": [
+          {
+            "symbol": "r",
+            "meaning": "该基元反应的反应速率。"
+          },
+          {
+            "symbol": "k",
+            "meaning": "速率常数。"
+          },
+          {
+            "symbol": "[A],[B],[C],[D]",
+            "meaning": "各物种浓度；非反应物C、D在此式指数为0。"
+          },
+          {
+            "symbol": "v_A,v_B",
+            "meaning": "反应物的反应级数，此基元反应中对应化学计量系数。"
+          }
+        ],
+        "source_ids": [
+          "p4-g27",
+          "p4-g29",
+          "p4-g31"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g27",
+        "p4-g29",
+        "p4-g31"
+      ],
+      "replace_labels": [
+        "Eq. 3"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "80ecb07d8b927176f11827b0175ee3b32869d268a946e162bf578d4b1602a3c4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-s1",
+      "equation": {
+        "label": "S1",
+        "latex": "\\begin{array}{l}\\frac{d[A]}{dt}=-2k_1[A]^2-k_2[A]\\\\\\frac{d[B]}{dt}=k_1[A]^2-k_4[B][D]\\\\\\frac{d[C]}{dt}=k_2[A]-k_3[C]\\\\\\frac{d[D]}{dt}=k_3[C]-k_4[B][D]\\\\\\frac{d[E]}{dt}=k_4[B][D]\\end{array}",
+        "meaning": "案例I中各物种浓度随时间变化的速率方程，假设无温度依赖。",
+        "symbols": [
+          {
+            "symbol": "[A],[B],[C],[D],[E]",
+            "meaning": "案例I五种物种的浓度；方括号表示浓度。"
+          },
+          {
+            "symbol": "k_1,k_2,k_3,k_4",
+            "meaning": "案例I四个基元反应的速率常数，依次对应2A→B、A→C、C→D与B+D→E。"
+          },
+          {
+            "symbol": "t",
+            "meaning": "时间；d[X]/dt是物种X的净生成速率，消耗项取负号。"
+          }
+        ],
+        "source_ids": [
+          "p25-g374",
+          "p25-g375",
+          "p25-g376",
+          "p25-g377",
+          "p25-g378",
+          "p25-g379",
+          "p25-g380",
+          "p25-g381",
+          "p25-g382",
+          "p25-g383",
+          "p25-g384",
+          "p25-g385",
+          "p25-g386",
+          "p25-g387"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p25-g374",
+        "p25-g375",
+        "p25-g376",
+        "p25-g377",
+        "p25-g378",
+        "p25-g379",
+        "p25-g380",
+        "p25-g381",
+        "p25-g382",
+        "p25-g383",
+        "p25-g384",
+        "p25-g385",
+        "p25-g386",
+        "p25-g387"
+      ],
+      "replace_labels": [
+        "S1",
+        "Eq. S1"
+      ],
+      "why": "对照当前PDF第25页（印刷页码24）的完整S1，恢复五条守恒速率式与补充材料编号；正文Eq.1保留为独立反应表达式。",
+      "verification": {
+        "pages": [
+          25
+        ],
+        "page_image_sha256": {
+          "25": "e4d1ad068d05f1498513e3e10c8123e914363ac64fb8c74fb0b37717ea89f9c3"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-neuron-formula",
+      "equation": {
+        "label": "Neuron formula",
+        "latex": "y=\\sigma(\\mathbf{w}\\mathbf{x}+b)",
+        "meaning": "原文用于解释神经元与基元反应映射的未编号公式。x是输入、y输出、w权重、b偏置、σ非线性激活；CRNN对应的指数激活不能与活化能Ea混淆。",
+        "symbols": [
+          {
+            "symbol": "x,y",
+            "meaning": "神经元输入与输出。"
+          },
+          {
+            "symbol": "w,b",
+            "meaning": "权重与偏置。"
+          },
+          {
+            "symbol": "σ",
+            "meaning": "非线性激活函数；质量作用定律映射采用指数函数。"
+          }
+        ],
+        "source_ids": [
+          "p4-g32"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p4-g32"
+      ],
+      "replace_labels": [
+        "Neuron Formula"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "80ecb07d8b927176f11827b0175ee3b32869d268a946e162bf578d4b1602a3c4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-4",
+      "equation": {
+        "label": "Eq. 4",
+        "latex": "k = A T^b \\exp \\left( - \\frac{E_a}{R T} \\right)",
+        "meaning": "修正的三参数阿伦尼乌斯公式，描述速率常数 $k$ 与温度 $T$ 的关系。",
+        "symbols": [
+          {
+            "symbol": "k",
+            "meaning": "速率常数。"
+          },
+          {
+            "symbol": "A",
+            "meaning": "指前因子或碰撞频率因子。"
+          },
+          {
+            "symbol": "T",
+            "meaning": "绝对温度。"
+          },
+          {
+            "symbol": "b",
+            "meaning": "非指数温度依赖项的拟合参数。"
+          },
+          {
+            "symbol": "E_a",
+            "meaning": "活化能；原页正文写activation function，按上下文为术语疑误，不能把它与神经网络激活函数混同。"
+          },
+          {
+            "symbol": "R",
+            "meaning": "气体常数；须与E_a采用一致能量单位。"
+          }
+        ],
+        "source_ids": [
+          "p5-g50",
+          "p5-g51",
+          "p5-g52",
+          "p5-g48"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p5-g50",
+        "p5-g51",
+        "p5-g52",
+        "p5-g48"
+      ],
+      "replace_labels": [
+        "4"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "71a655ac3f8a3ba1caadcda4b8cec049a7cbbdd7e05b12b59bf38059262e6f6b"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-5",
+      "equation": {
+        "label": "Eq. 5",
+        "latex": "\\ln k = \\ln A + b \\ln T - \\frac{E_a}{R T}",
+        "meaning": "阿伦尼乌斯公式的对数线性化形式。",
+        "symbols": [
+          {
+            "symbol": "k",
+            "meaning": "速率常数。"
+          },
+          {
+            "symbol": "A",
+            "meaning": "指前因子或碰撞频率因子。"
+          },
+          {
+            "symbol": "T",
+            "meaning": "绝对温度。"
+          },
+          {
+            "symbol": "b",
+            "meaning": "非指数温度依赖项的拟合参数。"
+          },
+          {
+            "symbol": "E_a",
+            "meaning": "活化能；原页正文写activation function，按上下文为术语疑误，不能把它与神经网络激活函数混同。"
+          },
+          {
+            "symbol": "R",
+            "meaning": "气体常数；须与E_a采用一致能量单位。"
+          }
+        ],
+        "source_ids": [
+          "p5-g55",
+          "p5-g56",
+          "p5-g48",
+          "p5-g52"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p5-g55",
+        "p5-g56",
+        "p5-g48",
+        "p5-g52"
+      ],
+      "replace_labels": [
+        "5"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "71a655ac3f8a3ba1caadcda4b8cec049a7cbbdd7e05b12b59bf38059262e6f6b"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-6",
+      "equation": {
+        "label": "Eq. 6",
+        "latex": "\\dot{\\mathbf{Y}} = CRNN(\\mathbf{Y})",
+        "meaning": "CRNN 定义的化学反应动力学方程，描述物种浓度向量随时间的变化率。",
+        "symbols": [
+          {
+            "symbol": "\\mathbf{Y}",
+            "meaning": "物种浓度向量"
+          },
+          {
+            "symbol": "\\dot{\\mathbf{Y}}",
+            "meaning": "浓度随时间的变化率（生成率）"
+          },
+          {
+            "symbol": "CRNN",
+            "meaning": "化学反应神经网络模型"
+          }
+        ],
+        "source_ids": [
+          "p6-g60"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p6-g60"
+      ],
+      "replace_labels": [
+        "6"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          6
+        ],
+        "page_image_sha256": {
+          "6": "9cfeadf8d3195f70ff8175639da8cbb4b42189ffdeeb63cd1c5ab2662fcaae63"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-7",
+      "equation": {
+        "label": "Eq. 7",
+        "latex": "\\mathbf{Y}^{CRNN}(t)=\\operatorname{ODESolve}(\\operatorname{CRNN}(\\mathbf{Y}),\\mathbf{Y}_0)",
+        "meaning": "通过 ODE 求解器得到的 CRNN 预测浓度时间序列。",
+        "symbols": [
+          {
+            "symbol": "\\mathbf{Y}_{CRNN}(t)",
+            "meaning": "时刻 t 的预测浓度向量"
+          },
+          {
+            "symbol": "\\mathbf{Y}_0",
+            "meaning": "初始浓度向量"
+          }
+        ],
+        "source_ids": [
+          "p6-g62"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p6-g62"
+      ],
+      "replace_labels": [
+        "7"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          6
+        ],
+        "page_image_sha256": {
+          "6": "9cfeadf8d3195f70ff8175639da8cbb4b42189ffdeeb63cd1c5ab2662fcaae63"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-8",
+      "equation": {
+        "label": "Eq. 8",
+        "latex": "\\operatorname{Loss}=\\operatorname{MAE}(\\mathbf{Y}^{CRNN}(t),\\mathbf{Y}^{data}(t))",
+        "meaning": "损失函数，定义为预测浓度与实测浓度之间的平均绝对误差。",
+        "symbols": [
+          {
+            "symbol": "\\text{Loss}",
+            "meaning": "损失值"
+          },
+          {
+            "symbol": "\\text{MAE}",
+            "meaning": "平均绝对误差"
+          },
+          {
+            "symbol": "\\mathbf{Y}_{data}(t)",
+            "meaning": "时刻 t 的实测浓度向量"
+          }
+        ],
+        "source_ids": [
+          "p6-g63"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p6-g63"
+      ],
+      "replace_labels": [
+        "8"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          6
+        ],
+        "page_image_sha256": {
+          "6": "9cfeadf8d3195f70ff8175639da8cbb4b42189ffdeeb63cd1c5ab2662fcaae63"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-9",
+      "equation": {
+        "label": "Eq. 9",
+        "latex": "\\begin{array}{l}2A\\xrightarrow{k_1}B\\\\A\\xrightarrow{k_2}C\\\\C\\xrightarrow{k_3}D\\\\B+D\\xrightarrow{k_4}E\\end{array}",
+        "meaning": "案例I的四步基元反应网络；此处原式只标k1–k4，数值另见表格，不能把B-CRNN的训练规模或时间单位移植到本篇。",
+        "symbols": [
+          {
+            "symbol": "A,B,C,D,E",
+            "meaning": "五种化学物种。"
+          },
+          {
+            "symbol": "k_1,k_2,k_3,k_4",
+            "meaning": "四步反应的速率常数；不同反应级数对应不同单位。"
+          }
+        ],
+        "source_ids": [
+          "p8-g79",
+          "p8-g80",
+          "p8-g81",
+          "p8-g82",
+          "p8-g83",
+          "p8-g84",
+          "p8-g85",
+          "p8-g86",
+          "p8-g78"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p8-g79",
+        "p8-g80",
+        "p8-g81",
+        "p8-g82",
+        "p8-g83",
+        "p8-g84",
+        "p8-g85",
+        "p8-g86",
+        "p8-g78"
+      ],
+      "replace_labels": [],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          8
+        ],
+        "page_image_sha256": {
+          "8": "ddc9d510d6d1b721e37dc05fb6b9b5137509858bd0d0f4f8914dd44445524828"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-10",
+      "equation": {
+        "label": "Eq. 10",
+        "latex": "\\begin{array}{l}TG + ROH \\xrightarrow{k_1} DG + R'CO_2R\\\\DG + ROH \\xrightarrow{k_2} MG + R'CO_2R\\\\MG + ROH \\xrightarrow{k_3} GL + R'CO_2R\\end{array}",
+        "meaning": "生物柴油生产的三个连续酯交换反应。TG: 甘油三酯, ROH: 醇, DG: 二甘油酯, MG: 单甘油酯, GL: 甘油, R'CO2R: 脂肪酸甲酯。",
+        "symbols": [
+          {
+            "symbol": "k_1, k_2, k_3",
+            "meaning": "各步反应的速率常数，遵循Arrhenius定律"
+          },
+          {
+            "symbol": "TG, DG, MG, GL",
+            "meaning": "甘油三酯、二甘油酯、单甘油酯、甘油"
+          }
+        ],
+        "source_ids": [
+          "p13-g164",
+          "p13-g165",
+          "p13-g166",
+          "p13-g167",
+          "p13-g168",
+          "p13-g169",
+          "p13-g170",
+          "p13-g161",
+          "p13-g162"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p13-g164",
+        "p13-g165",
+        "p13-g166",
+        "p13-g167",
+        "p13-g168",
+        "p13-g169",
+        "p13-g170",
+        "p13-g161",
+        "p13-g162"
+      ],
+      "replace_labels": [
+        "Eq. 10 (Reconstructed)"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          13
+        ],
+        "page_image_sha256": {
+          "13": "3cebbadd667418011f2d650071310fa4af4e5a0fdd63906aef716d5432f5ff84"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-eq-11",
+      "equation": {
+        "label": "Eq. 11",
+        "latex": "\\begin{array}{l}S + MAP3K \\rightarrow S + MAP3K^*\\\\MAP3K^* + MAP2K \\rightarrow MAP3K^* + MAP2K^*\\\\MAP2K^* + MAPK \\rightarrow MAP2K^* + MAPK^*\\\\MAPK^* + TF \\rightarrow MAPK^* + TF^*\\\\MAP3K^* \\rightarrow MAP3K\\\\MAP2K^* \\rightarrow MAP2K\\\\MAPK^* \\rightarrow MAPK\\\\TF^* \\rightarrow TF\\end{array}",
+        "meaning": "MAPK信号通路的地面真值反应网络，包含四级级联激活和对应的失活过程。箭头左侧为反应物，右侧为产物。*表示活性/磷酸化状态。",
+        "symbols": [
+          {
+            "symbol": "S",
+            "meaning": "初始刺激信号分子"
+          },
+          {
+            "symbol": "MAP3K, MAP2K, MAPK",
+            "meaning": "三级丝裂原活化蛋白激酶，非活性状态"
+          },
+          {
+            "symbol": "MAP3K*, MAP2K*, MAPK*",
+            "meaning": "对应的活性/磷酸化激酶"
+          },
+          {
+            "symbol": "TF",
+            "meaning": "转录因子，非活性状态"
+          },
+          {
+            "symbol": "TF*",
+            "meaning": "活性/磷酸化转录因子"
+          }
+        ],
+        "source_ids": [
+          "p17-g217",
+          "p17-g218",
+          "p17-g219",
+          "p17-g220",
+          "p17-g221",
+          "p17-g222",
+          "p17-g223",
+          "p17-g224",
+          "p17-g225"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p17-g217",
+        "p17-g218",
+        "p17-g219",
+        "p17-g220",
+        "p17-g221",
+        "p17-g222",
+        "p17-g223",
+        "p17-g224",
+        "p17-g225"
+      ],
+      "replace_labels": [
+        "Eq. 11"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          17
+        ],
+        "page_image_sha256": {
+          "17": "b2c1897176f230cc9e34f44febafaf24ee1b9df3de8fe13b63199533b4f13b6d"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-s2",
+      "equation": {
+        "label": "S2",
+        "latex": "\\begin{array}{l}\\frac{d[TG]}{dt}=-r_1\\\\\\frac{d[ROH]}{dt}=-r_1-r_2-r_3\\\\\\frac{d[DG]}{dt}=r_1-r_2\\\\\\frac{d[MG]}{dt}=r_2-r_3\\\\\\frac{d[GL]}{dt}=r_3\\\\\\frac{d[R^{\\prime}CO_2R]}{dt}=r_1+r_2+r_3\\\\r_1=k_1[TG][ROH]\\\\r_1=k_2[DG][ROH]\\\\r_1=k_3[MG][ROH]\\end{array}",
+        "meaning": "逐项转录原PDF附录S2。原页末三条速率式左端确实均为r1；按右端反应物和k下标推断后两条可能应为r2、r3，但该推断不能静默改进原式。用于计算时须明确采用何种经复核解释。",
+        "symbols": [
+          {
+            "symbol": "TG,DG,MG,GL",
+            "meaning": "甘油三酯、二甘油酯、单甘油酯、甘油。"
+          },
+          {
+            "symbol": "ROH,R′CO2R",
+            "meaning": "醇与酯产物。"
+          },
+          {
+            "symbol": "r_1,r_2,r_3",
+            "meaning": "三步速率；末三行r1重复是原页记号疑点。"
+          },
+          {
+            "symbol": "k_1,k_2,k_3",
+            "meaning": "相应步的速率常数，温度依赖见正文。"
+          }
+        ],
+        "source_ids": [
+          "p26-g393",
+          "p26-g394",
+          "p26-g395",
+          "p26-g396",
+          "p26-g397",
+          "p26-g398",
+          "p26-g399",
+          "p26-g400",
+          "p26-g401",
+          "p26-g402",
+          "p26-g403",
+          "p26-g404",
+          "p26-g405",
+          "p26-g406",
+          "p26-g407",
+          "p26-g408",
+          "p26-g409",
+          "p26-g410",
+          "p26-g411",
+          "p26-g412",
+          "p26-g413",
+          "p26-g416"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p26-g393",
+        "p26-g394",
+        "p26-g395",
+        "p26-g396",
+        "p26-g397",
+        "p26-g398",
+        "p26-g399",
+        "p26-g400",
+        "p26-g401",
+        "p26-g402",
+        "p26-g403",
+        "p26-g404",
+        "p26-g405",
+        "p26-g406",
+        "p26-g407",
+        "p26-g408",
+        "p26-g409",
+        "p26-g410",
+        "p26-g411",
+        "p26-g412",
+        "p26-g413",
+        "p26-g416"
+      ],
+      "replace_labels": [
+        "S2 (Partial)",
+        "S2 (Fragment)",
+        "S2 (Rate Laws)"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          26
+        ],
+        "page_image_sha256": {
+          "26": "dd21a509eb6cfd982b5b5ccc9f26c598f6a052bd4ece9fef6af4f0f24249156a"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-s3",
+      "equation": {
+        "label": "S3",
+        "latex": "\\begin{array}{l}\\frac{d[S]}{dt}=0\\\\\\frac{d[MAP3K]}{dt}=-r_1+r_5\\\\\\frac{d[MAP3K^*]}{dt}=r_1-r_5\\\\\\frac{d[MAP2K]}{dt}=-r_2+r_6\\\\\\frac{d[MAP2K^*]}{dt}=r_2-r_6\\\\\\frac{d[MAPK]}{dt}=-r_3+r_7\\\\\\frac{d[MAPK^*]}{dt}=r_3-r_7\\\\\\frac{d[TF]}{dt}=-r_4+r_8\\\\\\frac{d[TF^*]}{dt}=r_4-r_8\\\\r_1=k_1[S][MAP3K]\\\\r_2=k_2[MAP3K^*][MAP2K]\\\\r_3=k_3[MAP2K^*][MAPK]\\\\r_4=k_4[MAPK^*][TF]\\\\r_5=k_5[MAP3K^*]\\\\r_6=k_6[MAP2K^*]\\\\r_7=k_7[MAPK^*]\\\\r_8=k_8[TF^*]\\end{array}",
+        "meaning": "完整保留原附录九条浓度方程及八条速率式。S的净变化率为0但仍进入r1，体现其催化作用；简化速率表达不等于证明真实生物机理是对应分子数的基元反应。",
+        "symbols": [
+          {
+            "symbol": "S",
+            "meaning": "初始刺激物，在模型中浓度不变但参与r1。"
+          },
+          {
+            "symbol": "MAP3K,MAP2K,MAPK,TF",
+            "meaning": "三级激酶与转录因子；星号表示活化态。"
+          },
+          {
+            "symbol": "r_1,…,r_8",
+            "meaning": "四个活化与四个失活步骤的速率。"
+          },
+          {
+            "symbol": "k_1,…,k_8",
+            "meaning": "对应速率常数。"
+          }
+        ],
+        "source_ids": [
+          "p28-g427",
+          "p28-g428",
+          "p28-g429",
+          "p28-g430",
+          "p28-g431",
+          "p28-g432",
+          "p28-g433",
+          "p28-g434",
+          "p28-g435",
+          "p28-g436",
+          "p28-g437",
+          "p28-g438",
+          "p28-g439",
+          "p28-g440",
+          "p28-g441",
+          "p28-g442",
+          "p28-g443",
+          "p28-g444",
+          "p28-g445",
+          "p28-g446",
+          "p28-g447",
+          "p28-g448",
+          "p28-g449",
+          "p28-g450",
+          "p28-g451",
+          "p28-g452",
+          "p28-g453",
+          "p28-g454",
+          "p28-g455",
+          "p28-g456",
+          "p28-g457",
+          "p28-g458",
+          "p28-g459",
+          "p28-g460"
+        ],
+        "document_id": "main"
+      },
+      "source_ids": [
+        "p28-g427",
+        "p28-g428",
+        "p28-g429",
+        "p28-g430",
+        "p28-g431",
+        "p28-g432",
+        "p28-g433",
+        "p28-g434",
+        "p28-g435",
+        "p28-g436",
+        "p28-g437",
+        "p28-g438",
+        "p28-g439",
+        "p28-g440",
+        "p28-g441",
+        "p28-g442",
+        "p28-g443",
+        "p28-g444",
+        "p28-g445",
+        "p28-g446",
+        "p28-g447",
+        "p28-g448",
+        "p28-g449",
+        "p28-g450",
+        "p28-g451",
+        "p28-g452",
+        "p28-g453",
+        "p28-g454",
+        "p28-g455",
+        "p28-g456",
+        "p28-g457",
+        "p28-g458",
+        "p28-g459",
+        "p28-g460"
+      ],
+      "replace_labels": [
+        "S3 (Governing Equations)",
+        "S3 (Rate Laws)"
+      ],
+      "why": "对照当前PDF原页确认该公式；恢复可靠数学排版及完整来源，原始提取文本保持不变。",
+      "verification": {
+        "pages": [
+          28
+        ],
+        "page_image_sha256": {
+          "28": "8637c62e897a39ded86cdf87eac5c292f5075eb8c7d29b3bd71423a6773e3ad0"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    }
+  ],
+  "content_corrections": [],
+  "semantic_constraints": [
+    {
+      "id": "crnn-full-translation",
+      "instruction": "逐段译述必须翻译正文中的实际定义、向量、参数、条件和限定词，不得以“本段定义/说明/引入”替代其科学内容；标题不能借用下一段正文。",
+      "source_ids": [
+        "p4-g27",
+        "p4-g29",
+        "p4-g32",
+        "p4-g42"
+      ],
+      "verification": {
+        "pages": [
+          4
+        ],
+        "page_image_sha256": {
+          "4": "80ecb07d8b927176f11827b0175ee3b32869d268a946e162bf578d4b1602a3c4"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-weights",
+      "instruction": "输入权重对应反应级数，输出权重对应净化学计量系数；等温偏置对应ln(k)，不是k本身。催化物种可有非零输入级数而净输出系数为0。",
+      "source_ids": [
+        "p4-g42",
+        "p17-g217"
+      ],
+      "verification": {
+        "pages": [
+          4,
+          17
+        ],
+        "page_image_sha256": {
+          "4": "80ecb07d8b927176f11827b0175ee3b32869d268a946e162bf578d4b1602a3c4",
+          "17": "b2c1897176f230cc9e34f44febafaf24ee1b9df3de8fe13b63199533b4f13b6d"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-source-typos",
+      "instruction": "保留原页疑点并显式解释：Ea正文写activation function；S2末三速率式均写r1。不能把上下文推断修正冒充原文。",
+      "source_ids": [
+        "p5-g52",
+        "p26-g411",
+        "p26-g412",
+        "p26-g413"
+      ],
+      "verification": {
+        "pages": [
+          5,
+          26
+        ],
+        "page_image_sha256": {
+          "5": "71a655ac3f8a3ba1caadcda4b8cec049a7cbbdd7e05b12b59bf38059262e6f6b",
+          "26": "dd21a509eb6cfd982b5b5ccc9f26c598f6a052bd4ece9fef6af4f0f24249156a"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-case1-conditions",
+      "instruction": "本篇案例I是30个模拟数据集、每个100个点、时间步0.4 time unit、5%相对浓度高斯噪声；不得写成B-CRNN的20个数据集/200步/0.4秒。原文time unit不可自行换为秒。",
+      "source_ids": [
+        "p8-g87"
+      ],
+      "verification": {
+        "pages": [
+          8
+        ],
+        "page_image_sha256": {
+          "8": "ddc9d510d6d1b721e37dc05fb6b9b5137509858bd0d0f4f8914dd44445524828"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-claim-strength",
+      "instruction": "原文abstract的addresses the curse of dimensionality不应扩写为普遍“解决了/克服了维度灾难”；物理结构的可解释性不自动保证唯一机理识别或任意分布外泛化。",
+      "source_ids": [
+        "p2-g15"
+      ],
+      "verification": {
+        "pages": [
+          2
+        ],
+        "page_image_sha256": {
+          "2": "f179586ebd7df082aa7fbb023bc322d270d9f802a2f24bac33ac614fc8c64516"
+        },
+        "method": "独立审阅者直接查看当前run完整原页图，核对原式的项、系数、上下标、正负号、箭头与来源ID；结合正文定义。图像哈希绑定当前PDF提取页。",
+        "original_formula_preserved": true
+      }
+    },
+    {
+      "id": "crnn-name-expansion",
+      "instruction": "论文标题与摘要明确将 CRNN 展开为 Chemical Reaction Neural Network（化学反应神经网络）。全文的标题、概览、主题、方法、术语与自测统一采用这一名称；不要套用 Continuous Reaction Neural Network、Convolutional Recurrent Neural Network、连续反应神经网络或卷积循环神经网络。CRNN-ODE 是将该化学反应神经网络与 ODE 求解结合，不改变 CRNN 的原文定义。",
+      "source_ids": [
+        "p2-g10",
+        "p2-g15"
+      ],
+      "verification": {
+        "pages": [
+          2
+        ],
+        "page_image_sha256": {
+          "2": "f179586ebd7df082aa7fbb023bc322d270d9f802a2f24bac33ac614fc8c64516"
+        },
+        "method": "独立审阅者直接核对完整原文及对应原页图；此约束来源为论文自身的标题、定义或完整段落，不以模型草稿作为科学依据。"
+      }
+    },
+    {
+      "id": "crnn-case2-evidence",
+      "instruction": "案例II的反应背景、Arrhenius参数与Eq.10/S2指向位于p13-g161/p13-g162；30个模拟实验、323–343 K温区、初值范围、每组50点、时间步长1、2:1划分与5%高斯噪声的具体条件位于p13-g163。叙述这些设置的条目必须引用p13-g163，不得仅引背景段p13-g161。该段只报告time step of 1，没有明确秒，勿自行增添时间单位。保留原文的5元素初始向量，若与体系物种数有疑问须说明原文，不静默补维。",
+      "source_ids": [
+        "p13-g161",
+        "p13-g162",
+        "p13-g163"
+      ],
+      "verification": {
+        "pages": [
+          13
+        ],
+        "page_image_sha256": {
+          "13": "3cebbadd667418011f2d650071310fa4af4e5a0fdd63906aef716d5432f5ff84"
+        },
+        "method": "独立审阅者直接核对完整原文及对应原页图；此约束来源为论文自身的标题、定义或完整段落，不以模型草稿作为科学依据。"
+      }
+    },
+    {
+      "id": "crnn-pruning-complete-context",
+      "instruction": "原文Figure4图注在p10-g120；后续p11-g128明确讨论Figure4b：阈值远小于1时损失不敏感，举0.01与0.5性能相同，并说明Figure5b采用0.01剪枝。因此不得把局部分块未见后文写成“全文未详述Fig4b/只有图注”。Figure5图注p11-g126结尾threshold=与紧接的p11-g127数值0.01属于同一完整图注；翻译和图表说明应保留这一值及两个来源ID。",
+      "source_ids": [
+        "p10-g120",
+        "p11-g126",
+        "p11-g127",
+        "p11-g128"
+      ],
+      "verification": {
+        "pages": [
+          10,
+          11
+        ],
+        "page_image_sha256": {
+          "10": "66cbc4620993b9c185d1a4bedd868733af8f9371477b13b61549fb8e4556d2a5",
+          "11": "29c802d9bd10302335403919f8415e408bed143b977b6c4139d1e5c1af2860f4"
+        },
+        "method": "独立审阅者直接核对完整原文及对应原页图；此约束来源为论文自身的标题、定义或完整段落，不以模型草稿作为科学依据。"
+      }
+    }
+  ]
+}

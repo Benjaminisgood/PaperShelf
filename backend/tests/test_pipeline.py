@@ -22,6 +22,10 @@ from papershelf_pipeline.provider import Provider
 
 
 def chunk_response(request):
+    if 'figure_drafts' in request:
+        return {'figures_tables':[{'input_id':entry['input_id'],**entry['value']} for entry in request['figure_drafts']]}
+    if 'overview' in request.get('schema',{}) and 'reading_route' in request.get('schema',{}):
+        return {'overview':'核对完整原文后按条件解释研究问题。','reading_route':['先核对条件与方法，再核对证据边界。'], 'reviewed_gaps':[{'input_gap_id':gap['id'],'text':gap['text'],'source_ids':[request['source_evidence'][0]['id']],'status':'retained','reason':'夹具保留待原文核验的科学疑点。'} for gap in request.get('gap_drafts',[])]}
     if 'items' in request:
         output = {key:[] for key in ('thematic_sections','methods','findings','critique','transfer','quiz','glossary')}
         output['coverage'] = []
@@ -49,7 +53,7 @@ def chunk_response(request):
         'records':[],
     }
     if request.get('reading_groups'):
-        output['clean_reading'] = [{'id':group['id'],'source_ids':group['source_ids'],'text':group['text'],'editing_notes':[]} for group in request['reading_groups']]
+        output['clean_reading'] = [{'id':group['id'],'source_ids':group['source_ids'],'text':group['text'],'translation':'完整译文：'+group['text'], 'translation_units':[{'unit_id':unit['id'],'translation':'完整直译：'+unit['text']} for unit in group.get('translation_units',[])], 'editing_notes':[]} for group in request['reading_groups']]
         output['thematic_sections'] = [{'title':'测量条件如何约束速率分析','paragraphs':[{'text':'测量得到的速率参数必须与对应的温度和样品条件一起解释。比较结果前应先核对来源所给出的观测范围和单位，再判断模型的适用边界，避免把不同条件下的结论直接混合。','source_ids':citation,'kind':'source'}]}]
     if request.get('fields'):
         first = request.get('evidence_blocks', blocks)[0]
@@ -64,7 +68,7 @@ class StubHandler(BaseHTTPRequestHandler):
         payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         self.calls.append(payload)
         request = json.loads(payload['messages'][-1]['content'])
-        if 'source_blocks' in request or 'reading_groups' in request or 'items' in request:
+        if 'source_blocks' in request or 'reading_groups' in request or 'items' in request or 'figure_drafts' in request or 'overview' in request.get('schema',{}):
             content = chunk_response(request)
         elif 'queries' in request.get('output',{}):
             content = {'queries':['rate constant','temperature']}
