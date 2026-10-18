@@ -236,9 +236,13 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
             if resource and not Path(resource).is_file():
                 raise PipelineError(f'原版本引用的图像资源缺失：{resource}')
         bundle = None
-        if editorial_corrections_path is not None:
+        # Revisions of an already reviewed edition retain its source-bound
+        # evidence. Revalidate the source and page hashes before applying it;
+        # an explicit replacement bundle takes precedence.
+        review_path = editorial_corrections_path or original.get('artifacts', {}).get('editorial_corrections_input')
+        if review_path is not None:
             from .editorial_review import load_editorial_review
-            corrections = Path(editorial_corrections_path).expanduser().resolve()
+            corrections = Path(review_path).expanduser().resolve()
             bundle = load_editorial_review(corrections, source)
             correction_copy = directory / 'editorial-corrections-input.json'
             shutil.copyfile(corrections, correction_copy)

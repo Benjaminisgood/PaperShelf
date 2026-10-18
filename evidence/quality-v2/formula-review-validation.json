@@ -5,10 +5,11 @@
   "bundles": [
     {
       "bundle": "evidence/quality-v2/formula-review-crnn.json",
-      "sha256": "fad41b2dc6fe8271b22efaf3eb19efa6e239b84c7372e176d8daa5c5415feced",
+      "sha256": "e4a876e777b2532a6f4dd581b4f2417da335b09efcc2984243faaea1c3a4c1dc",
       "equations": 15,
       "content_corrections": 0,
       "semantic_constraints": 8,
+      "reading_notes": 1,
       "bundle_ids_unique": true,
       "normalized_equation_keys_unique": true,
       "alias_ownership_unique": true,
@@ -18,10 +19,11 @@
     },
     {
       "bundle": "evidence/quality-v2/formula-review-bcrnn.json",
-      "sha256": "4f379a7621e1975fc2f97f9bb41cb15caf48a6548265005291ac8c111f815409",
+      "sha256": "56da7f8d55a6a1feb51ca876bb4f5fdc0da8bfa85fc0058ff4931b8d8d59f15e",
       "equations": 31,
       "content_corrections": 6,
       "semantic_constraints": 11,
+      "reading_notes": 3,
       "bundle_ids_unique": true,
       "normalized_equation_keys_unique": true,
       "alias_ownership_unique": true,

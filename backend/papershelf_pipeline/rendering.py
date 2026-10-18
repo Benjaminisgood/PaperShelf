@@ -119,6 +119,8 @@ def render_guide(source: dict, learning: dict, extraction: dict, run_dir: Path, 
         out.append(f'<div class="paragraph" id="learn-{identifier}" data-highlight data-document-id="{esc(doc_id(paragraph))}"><div class="meta">第 {block["page"]} 页 · {esc(identifier)} {refs(identifiers,blocks)}</div><p>{esc(paragraph["explanation"])}</p>')
         if paragraph.get("reasoning"):
             out.append(f'<div class="callout"><p>{esc(paragraph["reasoning"])}</p></div>')
+        for note in paragraph.get('editorial_notes', []):
+            out.append('<aside class="callout"><p>原文校核：' + esc(note['text']) + '</p>' + refs(note['source_ids'], blocks) + '</aside>')
         if paragraph.get("key_sentence"):
             out.append(f'<details><summary>原文关键句 · p.{block["page"]}</summary><p lang="en">{esc(paragraph["key_sentence"])}</p></details>')
         original = '\n\n'.join(blocks[item]['text'] for item in identifiers if item in blocks)

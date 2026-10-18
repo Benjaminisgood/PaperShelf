@@ -66,6 +66,8 @@ def render_reading_editions(source: dict, learning: dict, directory: Path) -> di
             output.extend(['```text', text, '```', ''])
         else:
             output.extend([text, ''])
+        for note in group.get('editorial_notes', []):
+            output.extend(['> 原文校核：' + note['text'].replace('\n', '\n> '), '', citations(note['source_ids']), ''])
         output.extend(['<details><summary>来源与校订记录</summary>', '', citations(identifiers), ''])
         notes = list(group.get('reading_notes', [])) + list(group.get('editing_notes', []))
         notes.extend(note for identifier in identifiers if identifier in blocks for note in blocks[identifier].get('reading_notes', []))
@@ -101,6 +103,8 @@ def render_reading_editions(source: dict, learning: dict, directory: Path) -> di
     for paragraph in learning.get('paragraphs', []):
         identifiers = paragraph.get('source_ids') or [paragraph['source_id']]
         paragraphs.extend(['## ' + identifiers[0], '', paragraph['explanation'], '', paragraph.get('reasoning', ''), '', citations(identifiers), ''])
+        for note in paragraph.get('editorial_notes', []):
+            paragraphs.extend(['> 原文校核：' + note['text'].replace('\n', '\n> '), '', citations(note['source_ids']), ''])
         if paragraph.get('key_sentence'):
             paragraphs.extend(['> ' + paragraph['key_sentence'].replace('\n', '\n> '), ''])
     (directory / 'paragraphs.md').write_text('\n'.join(paragraphs), encoding='utf-8')

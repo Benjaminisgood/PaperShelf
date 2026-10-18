@@ -6,9 +6,50 @@ from pathlib import Path
 from papershelf_pipeline.contracts import PipelineError, sha256, write_json, read_json
 from papershelf_pipeline.editorial_review import load_editorial_review, apply_editorial_review
 from papershelf_pipeline.rendering import render_guide
+from papershelf_pipeline.reading_editions import render_reading_editions
 
 
 class EditorialReviewTests(unittest.TestCase):
+    def test_source_bound_caveat_is_visible_beside_original_and_translation_without_rewriting(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            page = root / 'page.jpg'
+            page.write_bytes(b'reviewed source page')
+            source = {'sha256': 'source-hash', 'path': 'paper.pdf', 'engine': 'fixture',
+                      'pages': [{'page': 1, 'text': 'Original convention.'}], 'reading_blocks': [],
+                      'blocks': [{'id': 'a', 'page': 1, 'text': 'Original convention.'},
+                                 {'id': 'b', 'page': 1, 'text': 'Another passage.'}],
+                      'figures': [{'page': 1, 'path': str(page)}]}
+            learning = {'mode': 'llm', 'title': 'Paper', 'overview': 'Overview', 'gaps': [],
+                        **{key: [] for key in ('methods', 'findings', 'transfer', 'equations', 'figures_tables', 'quiz', 'glossary', 'critique')},
+                        'clean_reading': [{'id': 'a', 'source_ids': ['a'], 'text': 'Original convention.'},
+                                          {'id': 'b', 'source_ids': ['b'], 'text': 'Another passage.'}],
+                        'paragraphs': [{'source_id': 'a', 'source_ids': ['a'], 'explanation': '原文表述。'}]}
+            note = {'text': 'The source convention differs from U < 0.', 'source_ids': ['a'],
+                    'verification': {'pages': [1], 'page_image_sha256': {'1': sha256(page)}, 'method': 'fixture source review'}}
+            bundle = {'source_sha256': source['sha256'], 'reviewer': 'test', 'reading_notes': [note]}
+            review = root / 'review.json'
+            write_json(review, bundle)
+            original_source = copy.deepcopy(source)
+            artifacts = apply_editorial_review(learning, source, load_editorial_review(review, source), root)
+            self.assertEqual(source, original_source)
+            self.assertEqual(learning['clean_reading'][0]['text'], 'Original convention.')
+            self.assertEqual(learning['paragraphs'][0]['explanation'], '原文表述。')
+            self.assertNotIn('editorial_notes', learning['clean_reading'][1])
+            self.assertFalse(learning['clean_reading'][0]['editorial_notes'][0]['human_scientific_acceptance'])
+            self.assertEqual(read_json(artifacts['editorial_review_draft'])['clean_reading'][0]['text'], 'Original convention.')
+            outputs = render_reading_editions(source, learning, root)
+            for key in ('source_markdown', 'paragraph_markdown'):
+                self.assertIn(note['text'], Path(outputs[key]).read_text())
+            # The fixture has no image metadata; its bytes are evidence only.
+            source['figures'] = []
+            html = render_guide(source, learning, {'records': []}, root, [])
+            self.assertIn('U &lt; 0', Path(html['html']).read_text())
+            source['figures'] = original_source['figures']
+            page.write_bytes(b'changed source page')
+            with self.assertRaises(PipelineError):
+                load_editorial_review(review, source)
+
     def test_exact_content_correction_updates_the_consolidated_body_visible_to_readers(self):
         source = {'sha256': 'hash', 'path': 'paper.pdf', 'engine': 'fixture', 'pages': [{'page': 1, 'text': 'Evidence'}],
                   'figures': [], 'blocks': [{'id': 'a', 'page': 1, 'text': 'Evidence'}]}
@@ -83,6 +124,15 @@ class EditorialReviewTests(unittest.TestCase):
             path = root / 'review.json'
             write_json(path, bundle)
             self.assertEqual(load_editorial_review(path, source), bundle)
+            conflicting = copy.deepcopy(bundle)
+            other = copy.deepcopy(conflicting['equations'][0])
+            other['equation']['label'] = 'S1'
+            other['replace_labels'] = ['Eq. 1']
+            conflicting['equations'].append(other)
+            write_json(path, conflicting)
+            with self.assertRaisesRegex(PipelineError, '别名'):
+                load_editorial_review(path, source)
+            write_json(path, bundle)
             with self.assertRaises(PipelineError):
                 load_editorial_review(path, {**source, 'sha256': 'changed'})
             page.write_bytes(b'other page')

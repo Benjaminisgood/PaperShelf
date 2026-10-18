@@ -8,7 +8,7 @@ from pathlib import Path
 
 from papershelf_pipeline.contracts import PipelineError
 from papershelf_pipeline.generation import make_learning, canonicalize_evidence, translation_units, validate_paragraph
-from papershelf_pipeline.synthesis import reading_groups, validate_reading, consolidate_learning, separate_process_notes, polish_reading, polish_translation_units, quarantine_equations, refresh_grounded_frontmatter, sentence_parts
+from papershelf_pipeline.synthesis import reading_groups, validate_reading, consolidate_learning, separate_process_notes, polish_reading, polish_translation_units, validate_polished_translation, literal_author_names, quarantine_equations, refresh_grounded_frontmatter, sentence_parts
 from test_pipeline import chunk_response
 
 
@@ -248,7 +248,8 @@ class SynthesisTests(unittest.TestCase):
               'A is the pre-exponential factor, T is absolute temperature, b is the temperature exponent, Ea is activation energy, and R is the gas constant.')
         group={'id':'p3-g63','source_ids':['p3-g63'],'text':text,'kind':'body','page':3,'pages':[3]}
         raw=text.replace('predict-ability','predict-\nability').replace('challen-ging','challen-\nging')
-        source={'blocks':[{'id':group['id'],'page':3,'text':raw}], 'reading_main_blocks':[group]}
+        constraint={'id':'source-definition','source_ids':[group['id']],'instruction':'Preserve the source definition; explain any ambiguity beside the original.'}
+        source={'blocks':[{'id':group['id'],'page':3,'text':raw}], 'reading_main_blocks':[group], 'editorial_review_context':{'semantic_constraints':[constraint,{'id':'other','source_ids':['other'],'instruction':'Unrelated.'}]}}
         draft={'source_id':group['id'],'explanation':'定义参数并说明方程。'}
         learning={'paragraphs':[draft], 'clean_reading':[]}
         translations=['该模型的设计旨在改善困难条件下的预测能力。', '在该方程中，Y(t)是物种浓度向量，其导数则是浓度的变化速率。', 'A是指前因子，T是绝对温度，b是温度指数，Ea是活化能，R是气体常数。']
@@ -263,6 +264,7 @@ class SynthesisTests(unittest.TestCase):
             self.assertTrue((Path(folder)/'chunks/polish-0001-invalid-1.json').is_file())
         self.assertEqual(len(calls),2)
         self.assertEqual(calls[0]['source_evidence'][0]['text'],raw)
+        self.assertEqual(calls[0]['reading_groups'][0]['editorial_constraints'],[constraint])
         self.assertEqual(set(calls[0]['schema']),{'clean_reading'})
         self.assertEqual(''.join(unit['text'] for unit in polish_translation_units(group)),text)
         self.assertIn('predictability',polished[0]['text'])
@@ -271,6 +273,72 @@ class SynthesisTests(unittest.TestCase):
         self.assertEqual(learning['paragraphs'][0]['explanation'],'\n\n'.join(translations))
         self.assertEqual(learning['paragraphs'][0]['key_sentence'],'')
         self.assertFalse(learning['reading_polish_review']['human_scientific_acceptance'])
+
+    def test_polish_preserves_literal_author_byline_without_guessing_chinese_identity(self):
+        group={'id':'authors','text':'Weiqi Ji, Sili Deng*','kind':'body'}
+        self.assertEqual(literal_author_names(group),['Weiqi Ji','Sili Deng'])
+        with self.assertRaisesRegex(PipelineError,'作者Latin姓名'):
+            validate_polished_translation({'translation':'季伟奇，邓思立*'},group)
+        validate_polished_translation({'translation':'Weiqi Ji，Sili Deng*'},group)
+        self.assertEqual(literal_author_names({'text':'Chemical Reaction Neural Network, Bayesian Inference','kind':'title'}),[])
+
+    def test_reading_rejects_claimed_word_repair_not_applied_to_text(self):
+        text='The differ-ences arise from generat-ing samples.'
+        group={'id':'p1-b1','source_ids':['p1-b1'],'text':text,'kind':'body','page':1,'pages':[1]}
+        item={'id':group['id'],'source_ids':group['source_ids'],'text':text,'editing_notes':["修复断词：differ-ences -> differences, generat-ing -> generating。"]}
+        with self.assertRaisesRegex(PipelineError,'声称已将 differ-ences|声称已将 generat-ing'):
+            validate_reading({'clean_reading':[item]},[group],[],check_themes=False)
+        item['text']=text.replace('differ-ences','differences').replace('generat-ing','generating')
+        validate_reading({'clean_reading':[item]},[group],[],check_themes=False)
+        item['text']=text
+        item['editing_notes']=['尚未修复 differ-ences 为 differences，仍待核对。']
+        validate_reading({'clean_reading':[item]},[group],[],check_themes=False)
+
+    def test_polish_retries_only_invalid_groups_with_complete_linked_evidence(self):
+        groups=[{'id':'g1','source_ids':['g1'],'text':'The value is unity.','kind':'body','page':1,'pages':[1],
+                 'linked_layout_source_ids':['fragment'],'inline_projections':[{'literal_prose_tail':{'source_id':'fragment','text':'in'}}]},
+                {'id':'g2','source_ids':['g2'],'text':'The other value is 2.','kind':'body','page':1,'pages':[1]}]
+        source={'blocks':[{'id':g['id'],'page':1,'text':g['text']} for g in groups]+[{'id':'fragment','page':1,'text':'[equation], in'}],'reading_main_blocks':groups}
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt);calls.append(request)
+                return {'clean_reading':[{'id':g['id'],'source_ids':g['source_ids'],'text':g['text'],'translation':('数值为1。' if len(calls)==1 else '数值为一。') if g['id']=='g1' else '另一个数值为2。','editing_notes':[]} for g in request['reading_groups']]}
+        with tempfile.TemporaryDirectory() as folder:
+            polished=polish_reading(source,{'clean_reading':[]},Provider(),Path(folder),lambda _:None)
+        self.assertEqual([[g['id'] for g in request['reading_groups']] for request in calls],[['g1','g2'],['g1']])
+        self.assertEqual([b['id'] for b in calls[1]['source_evidence']],['g1','fragment'])
+        self.assertEqual(calls[1]['reading_groups'][0]['inline_projections'],groups[0]['inline_projections'])
+        self.assertIn("新增{'1': 1}",calls[1]['validation_errors']['g1'])
+        self.assertEqual(polished[1]['translation'],'另一个数值为2。')
+
+    def test_polish_resume_revalidates_cache_and_rejects_changed_complete_input(self):
+        group={'id':'g1','source_ids':['g1'],'text':'The value is 2.','kind':'body','page':1,'pages':[1]}
+        source={'blocks':[{'id':'g1','page':1,'text':group['text']}],'reading_main_blocks':[group]}
+        item={'id':'g1','source_ids':['g1'],'text':group['text'],'translation':'数值为2。','editing_notes':[]}
+        for change in ('none','context','evidence','group','draft','invalid'):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as folder:
+                base=Path(folder);prior=base/'prior';current=base/'current'
+                (prior/'chunks').mkdir(parents=True);current.mkdir()
+                (prior/'source.json').write_text(json.dumps(source))
+                (prior/'chunks/chunk-0001.json').write_text(json.dumps({'clean_reading':[]}))
+                cached=copy.deepcopy(item)
+                if change=='invalid':cached['translation']='数值为3。'
+                (prior/'chunks/polish-0001.json').write_text(json.dumps({'clean_reading':[cached]}))
+                (current/'request.json').write_text(json.dumps({'resume_from':str(prior)}))
+                active=copy.deepcopy(source);learning={'clean_reading':[]};calls=[]
+                if change=='context':active['editorial_review_context']={'semantic_constraints':[]}
+                if change=='evidence':active['blocks'][0]['text']='The exact value is 2.'
+                if change=='group':active['reading_main_blocks'][0]['reading_notes']=['Source reading projection changed.']
+                if change=='draft':learning['clean_reading']=[item]
+                class Provider:
+                    def json(self,system,prompt):
+                        calls.append(json.loads(prompt));return {'clean_reading':[copy.deepcopy(item)]}
+                polish_reading(active,learning,Provider(),current,lambda _:None)
+                self.assertEqual(len(calls),0 if change=='none' else 1)
+                saved=json.loads((current/'chunks/polish-0001.json').read_text())
+                self.assertEqual(bool(saved['resumed_from']),change in {'none','invalid'})
+                self.assertEqual(len(saved['input_sha256']),64)
 
     def test_raw_evidence_cannot_override_clean_paragraph_anchor(self):
         # The real CRNN extraction contains punctuation whitespace that the

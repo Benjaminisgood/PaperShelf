@@ -28,7 +28,8 @@ def load_editorial_review(path, source):
     blocks = {item['id']: item for item in source['blocks']}
     previews = {(item.get('document_id', 'main'), item['page']): item['path'] for item in source.get('figures', []) if item.get('path')}
     equation_keys = set()
-    for section in ('equations', 'content_corrections', 'semantic_constraints'):
+    equation_aliases = {}
+    for section in ('equations', 'content_corrections', 'semantic_constraints', 'reading_notes'):
         items = bundle.get(section, [])
         if not isinstance(items, list):
             raise PipelineError(f'校订证据 {section} 必须为数组。')
@@ -62,9 +63,20 @@ def load_editorial_review(path, source):
                 if key in equation_keys:
                     raise PipelineError('校订公式编号重复；正文与补充材料编号须保持独立。')
                 equation_keys.add(key)
+                aliases = item.get('replace_labels', [])
+                if not isinstance(aliases, list) or any(not isinstance(label, str) or not label.strip() for label in aliases):
+                    raise PipelineError('校订公式别名必须为非空文字数组。')
+                for label in [content['label']] + aliases:
+                    alias = _equation_key({**content, 'label': label}, blocks)
+                    owner = equation_aliases.setdefault(alias, key)
+                    if owner != key:
+                        raise PipelineError('校订公式别名与另一个公式冲突，不能交叉覆盖。')
             elif section == 'content_corrections':
                 if any(not isinstance(item.get(key), str) or not item[key] for key in ('section', 'field', 'original', 'corrected', 'why')):
                     raise PipelineError('正文修正须提供原值、新值及原因。')
+            elif section == 'reading_notes':
+                if not isinstance(item.get('text'), str) or not item['text'].strip():
+                    raise PipelineError('正文校核说明为空。')
             elif not isinstance(item.get('instruction'), str) or not item['instruction']:
                 raise PipelineError('语义核验记录为空。')
     return bundle
@@ -112,6 +124,23 @@ def apply_editorial_review(learning, source, bundle, directory):
                     item[correction['field']] = correction['corrected']
                     locations.append(f'{prefix}{correction["section"]}[{index}].{correction["field"]}')
         records.append({**correction, 'status': 'applied_exact_match' if locations else 'retained_as_grounding_constraint', 'matches': len(locations), 'locations': locations})
+    # Scientific caveats belong beside the affected passage as well as in the
+    # equation cards. These are verified annotations, never replacement prose.
+    for entry in bundle.get('reading_notes', []):
+        locations = []
+        annotation = {**copy.deepcopy(entry), 'reviewer': bundle['reviewer'],
+                      'source_sha256': source['sha256'], 'human_scientific_acceptance': False}
+        for collection in ('clean_reading', 'paragraphs'):
+            for index, item in enumerate(learning.get(collection, [])):
+                identifiers = item.get('source_ids') or [item.get('source_id')]
+                if not set(identifiers).intersection(entry['source_ids']):
+                    continue
+                notes = item.setdefault('editorial_notes', [])
+                if annotation not in notes:
+                    notes.append(copy.deepcopy(annotation))
+                locations.append(f'{collection}[{index}].editorial_notes')
+        records.append({'kind': 'reading_note', **copy.deepcopy(entry),
+                        'status': 'annotated' if locations else 'no_matching_reading_group', 'locations': locations})
     write_json(directory / 'learning-before-editorial-review.json', before)
     receipt = {'source_sha256': source['sha256'], 'reviewer': bundle['reviewer'], 'human_scientific_acceptance': False, 'records': records, 'semantic_constraints': bundle.get('semantic_constraints', [])}
     write_json(directory / 'editorial-review.json', receipt)

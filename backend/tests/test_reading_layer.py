@@ -272,6 +272,90 @@ class ReadingLayerTests(unittest.TestCase):
         self.assertEqual(joined['linked_layout_source_ids'], ['glyph'])
         self.assertEqual(result['reading_fragments'][0]['source_ids'], ['glyph'])
 
+    def test_run_in_headings_join_capitalized_names_only_on_a_tight_next_line(self):
+        cases = [('2.2.1 Hamiltonian Monte Carlo. The Hamiltonian Monte',
+                  'Carlo (HMC) method constructs a Markov chain.', 'Monte Carlo (HMC)'),
+                 ('2.2.2 Variational inference. Rather than sampling a',
+                  'Markov chain, the method approximates the posterior.', 'sampling a Markov chain')]
+        for first, second, phrase in cases:
+            with self.subTest(first=first):
+                result = apply_reading_layer(source(block('a', first, box=(52, 200, 280, 210)),
+                                                    block('b', second, box=(40, 213, 280, 260))))
+                self.assertEqual(result['reading_main_blocks'][0]['source_ids'], ['a', 'b'])
+                self.assertIn(phrase, result['reading_main_blocks'][0]['text'])
+        separated = apply_reading_layer(source(block('a', cases[0][0], box=(52, 200, 280, 210)),
+                                              block('b', cases[0][1], box=(40, 245, 280, 280))))
+        self.assertEqual(len(separated['reading_main_blocks']), 2)
+
+    def test_two_column_page_rollover_crosses_a_bottom_float_without_merging_its_caption(self):
+        original = source(block('a', 'With an appropriate differential equation solver, we can', box=(320, 480, 560, 510)),
+                          block('fig', 'Figure 1. An overview of the reaction network.', box=(40, 650, 560, 700), size=8),
+                          block('b', 'generate an estimated trajectory for the concentration.', page=2, box=(40, 50, 280, 100)))
+        frozen = copy.deepcopy(original)
+        result = apply_reading_layer(original)
+        self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['a', 'b'], ['fig']])
+        self.assertIn('we can generate', result['reading_main_blocks'][0]['text'])
+        self.assertEqual(result['reading_main_blocks'][0]['linked_caption_source_ids'], ['fig'])
+        self.assertEqual(result['raw_blocks'], frozen['raw_blocks'])
+        self.assertEqual([b['text'] for b in result['blocks']], [b['text'] for b in frozen['blocks']])
+
+    def test_page_and_column_rollover_can_continue_below_a_top_float(self):
+        page = apply_reading_layer(source(
+            block('a', 'The regularization prevents the distribution from being totally', box=(320, 680, 560, 720)),
+            block('fig', 'Figure 2. Illustration of the two methods.', page=2, box=(40, 210, 280, 280), size=8),
+            block('b', 'dissimilar to the prior distribution.', page=2, box=(40, 325, 280, 355))))
+        self.assertEqual([g['source_ids'] for g in page['reading_main_blocks']], [['a', 'b'], ['fig']])
+        column = apply_reading_layer(source(
+            block('a', 'Mean field approximation applies, i.e., the Gaussian', box=(40, 380, 280, 490)),
+            block('fig', 'Figure 4. Estimates of the parameter distributions.', box=(320, 210, 560, 250), size=8),
+            block('b', 'distributions of the parameters are independent.', box=(320, 275, 560, 300))))
+        self.assertEqual([g['source_ids'] for g in column['reading_main_blocks']], [['a', 'b'], ['fig']])
+
+    def test_float_does_not_license_a_complete_sentence_or_different_document_join(self):
+        for suffix, document in [('.', 'main'), ('', 'supplement')]:
+            with self.subTest(suffix=suffix, document=document):
+                result = apply_reading_layer(source(
+                    block('a', 'The previous explanation ends here' + suffix, box=(320, 680, 560, 720)),
+                    block('fig', 'Figure 2. A different illustration.', page=2, box=(40, 210, 280, 280), size=8),
+                    block('b', 'another explanation begins here.', page=2, box=(40, 325, 280, 355), document_id=document)))
+                self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['a'], ['fig'], ['b']])
+
+    def test_inline_fraction_fragments_have_a_position_marker_and_literal_prose_tail(self):
+        original = source(
+            block('a', 'The neuron inputs are concentrations in', box=(40, 100, 550, 140), size=12),
+            block('numerator', '𝑑[A]', box=(425, 146, 442, 155), size=8),
+            block('b', 'the logarithmic scale, and the outputs are species rates [', box=(40, 150, 420, 163), size=12),
+            block('denominator', '𝑑𝑡 ], in ', box=(450, 150, 495, 169), size=12),
+            block('c', 'short, the concentration derivatives. The weights encode reaction orders.', box=(40, 175, 550, 220), size=12))
+        frozen = copy.deepcopy(original)
+        result = apply_reading_layer(original)
+        group = result['reading_main_blocks'][0]
+        self.assertEqual(group['source_ids'], ['a', 'b', 'c'])
+        self.assertIn('concentrations in the logarithmic scale', group['text'])
+        self.assertIn('[⟦inline formula⟧], in short,', group['text'])
+        self.assertEqual(group['linked_layout_source_ids'], ['numerator', 'denominator'])
+        self.assertEqual([g['source_ids'] for g in result['reading_fragments']], [['numerator'], ['denominator']])
+        projection = group['inline_projections'][0]
+        self.assertEqual(projection['layout_source_ids'], ['numerator', 'denominator'])
+        tail = projection['literal_prose_tail']
+        raw = next(b['text'] for b in frozen['blocks'] if b['id'] == tail['source_id'])
+        self.assertEqual(raw[tail['raw_start']:tail['raw_end']].strip(), tail['text'])
+        self.assertEqual(tail['text'], '], in')
+        self.assertNotIn('d[A]/dt', group['text'])
+        self.assertEqual(result['raw_blocks'], frozen['raw_blocks'])
+        assigned = [i for g in result['reading_blocks'] + result['reading_excluded'] for i in g['source_ids']]
+        self.assertCountEqual(assigned, [b['id'] for b in frozen['blocks']])
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertEqual(apply_reading_layer(copy.deepcopy(result)), result)
+
+    def test_display_math_between_prose_does_not_become_an_inline_formula(self):
+        result = apply_reading_layer(source(
+            block('a', 'The reaction rate is given by', box=(40, 100, 280, 120)),
+            block('eq', 'r = k[A]', box=(40, 124, 280, 138)),
+            block('b', 'where the parameter follows the temperature law.', box=(40, 144, 280, 180))))
+        self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['a'], ['b']])
+        self.assertEqual(result['reading_fragments'][0]['source_ids'], ['eq'])
+
     def test_duplicate_source_ids_fail_instead_of_silently_aliasing(self):
         with self.assertRaises(ValueError): apply_reading_layer(source(block('same', 'First complete source paragraph.'), block('same', 'Second complete source paragraph.')))
 

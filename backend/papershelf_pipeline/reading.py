@@ -219,7 +219,7 @@ def _reading_role(block, metrics, repeated, cover_pages, body_sizes, page_counts
     return 'body', True, ''
 
 
-def _can_continue_reading(previous, current, metrics):
+def _can_continue_reading(previous, current, metrics, *, floating_blocks=()):
     role = previous.get('reading_role')
     if role not in {'body', 'reference'} or current.get('reading_role') != role:
         return False
@@ -228,8 +228,16 @@ def _can_continue_reading(previous, current, metrics):
     first, second = previous['reading_text'].rstrip(), current['reading_text'].lstrip()
     if not first or not second:
         return False
+    capital_continuation = False
     if role == 'body':
-        if re.search(r'[.!?。！？][\d,–—\-\]”"\')]*$', first) or not re.match(r'[a-z\u3400-\u9fff]', second):
+        # A run-in section title can share its line with the start of the
+        # paragraph ("... Carlo. The Hamiltonian Monte / Carlo ...").
+        # A capital letter alone must not block a tightly wrapped proper name.
+        run_in_heading = (re.match(r'^\d+(?:\.\d+)+\s+', first)
+                          and re.search(r'\.\s+(?:The|A|An|Rather|We)\b', first))
+        open_function_word = re.search(r'\b(?:a|an|the|of|in|for|with|by|to|and|or)\s*$', first, re.I)
+        capital_continuation = bool(re.match(r'[A-Z][a-z]', second) and (run_in_heading or open_function_word))
+        if re.search(r'[.!?。！？][\d,–—\-\]”"\')]*$', first) or not (re.match(r'[a-z\u3400-\u9fff]', second) or capital_continuation):
             return False
     elif re.match(r'^(?:\(\d{1,3}\)|\[\d{1,3}\]|\d{1,3}[.)]?)\s+[A-Z]', second):
         return False
@@ -243,13 +251,61 @@ def _can_continue_reading(previous, current, metrics):
     next_height = metrics.get(_document_page(current), (0, 0))[1]
     width_a, width_b = a[2] - a[0], b[2] - b[0]
     same_column = min(a[2], b[2]) - max(a[0], b[0]) > min(width_a, width_b) * .65
+    if capital_continuation and not (current['page'] == previous['page'] and same_column
+                                     and a[3] <= b[1] <= a[3] + size * 1.5):
+        return False
     if current['page'] == previous['page']:
         if same_column:
             return a[1] <= b[1] <= a[3] + size * 2.5 and b[0] <= a[0] + size * .7
         return bool(page_width and b[0] > a[0] + page_width * .25
                     and b[1] < a[3] and .7 < width_b / max(width_a, 1) < 1.45)
-    return bool(current['page'] == previous['page'] + 1 and same_column
-                and page_height and a[3] > page_height * .65 and b[1] < next_height * .23)
+    if current['page'] != previous['page'] + 1 or not page_height or not next_height:
+        return False
+    if same_column and a[3] > page_height * .65 and b[1] < next_height * .23:
+        return True
+    # Two-column journals continue from the right column to the next page's
+    # left column. A floating figure can occupy the bottom or the next page's
+    # top; require it to be the only intervening reading material.
+    next_width = metrics.get(_document_page(current), (0, 0))[0]
+    column_rollover = (a[0] > page_width * .45 and b[0] < next_width * .4
+                       and .7 < width_b / max(width_a, 1) < 1.45 and a[3] > page_height * .55)
+    upper_float = any(item.get('reading_role') == 'caption' and _document_page(item) == _document_page(current)
+                      and item.get('bbox') and item['bbox'][1] < next_height * .35
+                      and 0 <= b[1] - item['bbox'][3] <= max(size * 6, next_height * .08)
+                      for item in floating_blocks)
+    return bool(column_rollover and (b[1] < next_height * .23 or upper_float))
+
+
+def _inline_fragment_position(previous, current, fragments, metrics):
+    """Locate small inline glyph boxes beside a prose line, without decoding."""
+    if not fragments or not _can_continue_reading(previous, current, metrics):
+        return None
+    if _document_page(previous) != _document_page(current):
+        return None
+    size = _reading_font(previous)
+    if any(_document_page(fragment) != _document_page(previous) or not fragment.get('bbox')
+           or fragment.get('source_role_hint') == 'marginal' for fragment in fragments):
+        return None
+    a, b = previous['bbox'], current['bbox']
+    if all(fragment['bbox'][0] >= a[2] - size
+           and a[3] - size * 1.5 <= fragment['bbox'][1] <= a[3] + size
+           and fragment['bbox'][3] <= a[3] + size * 1.5 for fragment in fragments):
+        return 'after_previous'
+    if all(fragment['bbox'][0] >= b[2] - size
+           and b[1] - size <= fragment['bbox'][1] <= b[1] + size
+           and fragment['bbox'][3] <= b[1] + size * 1.8 for fragment in fragments):
+        return 'after_current'
+    return None
+
+
+def _inline_prose_tail(fragments):
+    """Copy a literal prose suffix mixed into the last inline formula block."""
+    fragment = fragments[-1]
+    match = re.search(r'[\])}][,;:]?\s+(?:in|and|or|where|with|as|for|to|of|by|is|are)(?:\s+[a-z]+){0,3}\s*$', fragment['text'])
+    if match:
+        return {'source_id': fragment['id'], 'text': match.group().strip(),
+                'raw_start': match.start(), 'raw_end': match.end()}
+    return None
 
 
 def _can_continue_numeric(previous, current, role):
@@ -322,6 +378,7 @@ def apply_reading_layer(source):
             abstract_tops[key] = min(b['bbox'][1] for b in long_paragraphs)
     excluded, groups, previous, previous_group = [], [], None, None
     by_id = {block['id']: block for block in blocks}
+    source_order = {block['id']: index for index, block in enumerate(blocks)}
     in_references = {}
     for block in blocks:
         role, included, reason = _reading_role(block, metrics, repeated, covers, body_sizes, page_counts, body_pages)
@@ -372,34 +429,72 @@ def apply_reading_layer(source):
             # not interrupt a supported page/column continuation.
             continue
         continuation = numeric_continuation or (previous is not None and _can_continue_reading(previous, block, metrics))
-        group, joined_from, skipped_fragments = previous_group, previous, []
+        group, joined_from, skipped_fragments, skipped_captions = previous_group, previous, [], []
+        inline_position, inline_tail = None, None
         if not continuation and role == 'body':
-            # Inline formula glyphs may be emitted before a wrapped word's
-            # continuation. Rejoin only an attested split word; keep the glyphs
-            # separately indexed, never pretend to reconstruct the equation.
+            # A float or inline glyph can interrupt the extraction order while
+            # the surrounding prose is still a single unfinished sentence.
             candidate = len(groups) - 1
-            while candidate >= 0 and groups[candidate]['kind'] in {'equation_fragment', 'layout_fragment'}:
-                skipped_fragments[0:0] = groups[candidate]['source_ids']
+            while candidate >= 0 and groups[candidate]['kind'] in {'equation_fragment', 'layout_fragment', 'caption'}:
+                target = skipped_captions if groups[candidate]['kind'] == 'caption' else skipped_fragments
+                target[0:0] = groups[candidate]['source_ids']
                 candidate -= 1
-            if skipped_fragments and candidate >= 0 and groups[candidate]['kind'] == 'body':
+            if (skipped_fragments or skipped_captions) and candidate >= 0 and groups[candidate]['kind'] == 'body':
                 proposed = groups[candidate]
                 last = by_id[proposed['source_ids'][-1]]
+                # A group can already span earlier floats. They stay in the
+                # physical list but must not be re-used for this new boundary.
+                skipped_fragments = [identifier for identifier in skipped_fragments
+                                     if source_order[identifier] > source_order[last['id']]]
+                skipped_captions = [identifier for identifier in skipped_captions
+                                    if source_order[identifier] > source_order[last['id']]]
+                fragments = [by_id[identifier] for identifier in skipped_fragments]
+                floats = [by_id[identifier] for identifier in skipped_captions]
                 left = re.search(r'([A-Za-z]{2,})-$', proposed['text'])
                 right = re.match(r'([a-z][A-Za-z]*)', text)
-                if (left and right and words.get((left[1] + right[1]).casefold(), 0)
-                        and _can_continue_reading(last, block, metrics)):
+                attested_word = (not floats and left and right and words.get((left[1] + right[1]).casefold(), 0)
+                                 and _can_continue_reading(last, block, metrics))
+                if not floats:
+                    inline_position = _inline_fragment_position(last, block, fragments, metrics)
+                # A same-column caption between paragraphs is not sufficient
+                # evidence for a float. Only a supported page/column transition
+                # can skip a caption, and the caption remains an independent
+                # group at its original canonical position.
+                column_transition = (last['page'] != block['page'] or (last.get('bbox') and block.get('bbox')
+                                     and block['bbox'][0] > last['bbox'][0] + metrics.get(_document_page(last), (0, 0))[0] * .25))
+                float_continuation = (floats and column_transition
+                                      and _can_continue_reading(last, block, metrics, floating_blocks=floats))
+                if attested_word or inline_position or float_continuation:
                     continuation, group, joined_from = True, proposed, last
+                    if inline_position == 'after_previous':
+                        inline_tail = _inline_prose_tail(fragments)
         if continuation:
-            combined, join_edits, join_notes = clean_reading_text(group['text'] + '\n' + text, words, compounds)
+            bridge = ''
+            if inline_position == 'after_previous':
+                # Make the unresolved position visible instead of silently
+                # placing "[ short" together or guessing the fraction. Any
+                # copied prose suffix is recorded with exact raw offsets.
+                bridge = ('' if group['text'].endswith(('[', '(', '{')) else ' ') + '⟦inline formula⟧' + (inline_tail['text'] if inline_tail else '')
+                group.setdefault('inline_projections', []).append({
+                    'after_source_id': joined_from['id'], 'marker': '⟦inline formula⟧',
+                    'layout_source_ids': list(dict.fromkeys(group.get('linked_layout_source_ids', []) + skipped_fragments)),
+                    'literal_prose_tail': inline_tail})
+            combined, join_edits, join_notes = clean_reading_text(group['text'] + bridge + '\n' + text, words, compounds)
             group['text'] = group['reading_text'] = combined
             group['source_ids'].append(block['id'])
             group['pages'] = list(dict.fromkeys(group['pages'] + [block['page']]))
             group['reading_notes'] = list(dict.fromkeys(group['reading_notes'] + notes + join_notes))
-            basis = 'numeric_continuation_after_equals_and_matching_layout' if numeric_continuation else 'unfinished_sentence_and_matching_layout'
+            basis = ('numeric_continuation_after_equals_and_matching_layout' if numeric_continuation else
+                     'unfinished_sentence_across_floating_caption' if skipped_captions else
+                     'unfinished_sentence_across_inline_math' if inline_position else 'unfinished_sentence_and_matching_layout')
             group.setdefault('joins', []).append({'from': joined_from['id'], 'to': block['id'], 'basis': basis, 'edits': join_edits})
             if skipped_fragments:
-                group.setdefault('linked_layout_source_ids', []).extend(skipped_fragments)
-                group['reading_notes'].append('断词之间的独立公式字形仍保留在版面片段索引，未据此重构公式。')
+                group['linked_layout_source_ids'] = list(dict.fromkeys(group.get('linked_layout_source_ids', []) + skipped_fragments))
+                group['reading_notes'].append('句中独立公式字形仍按原始编号保留在版面片段索引；行内位置以占位标记提示，未据此重构公式。' if inline_position else
+                                              '断词之间的独立公式字形仍保留在版面片段索引，未据此重构公式。')
+            if skipped_captions:
+                group['linked_caption_source_ids'] = list(dict.fromkeys(group.get('linked_caption_source_ids', []) + skipped_captions))
+                group['reading_notes'].append('正文依版面和未完句跨栏/跨页续接；中间浮动图注仍按原始编号独立保留。')
         else:
             groups.append(entry)
             group = entry

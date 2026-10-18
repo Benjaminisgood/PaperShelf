@@ -243,12 +243,27 @@ class RevisionTests(unittest.TestCase):
         bundle = {'source_sha256': source['sha256'], 'reviewer': 'fixture source review', 'semantic_constraints': [
             {'source_ids': [source['blocks'][0]['id']], 'instruction': 'Preserve the reported temperature.',
              'verification': {'pages': [1], 'page_image_sha256': {'1': sha256(self.preview)}, 'method': 'fixture page inspection'}}]}
+        bundle['reading_notes'] = [{'source_ids': [source['blocks'][0]['id']], 'text': 'Source-bound scientific caveat.',
+                                    'verification': copy.deepcopy(bundle['semantic_constraints'][0]['verification'])}]
         write_json(correction, bundle)
         result = self.perform(editorial_corrections_path=correction)
         self.assertEqual(read_json(result['artifacts']['source'])['editorial_review_context'], bundle)
         self.assertEqual(read_json(result['artifacts']['editorial_corrections_input']), bundle)
         self.assertFalse(read_json(result['artifacts']['editorial_review'])['human_scientific_acceptance'])
         self.assertEqual(self.snapshot_run(), self.snapshot)
+        # The UI's ordinary revise command passes no review path. It must not
+        # silently discard verified source notes on the next edition.
+        with patch('papershelf_pipeline.provider.Provider', EditingProvider):
+            repeated = revise(result['manifest_path'], progress=lambda message: None)
+        self.assertEqual(read_json(repeated['artifacts']['editorial_corrections_input']), bundle)
+        updated = read_json(repeated['artifacts']['learning'])
+        self.assertEqual(len(updated['clean_reading'][0]['editorial_notes']), 1)
+        self.assertIn('Source-bound scientific caveat.', Path(repeated['artifacts']['paragraph_markdown']).read_text())
+        # Reuse is subject to fresh page verification, not blind inheritance.
+        repeated_source = read_json(repeated['artifacts']['source'])
+        Path(repeated_source['figures'][0]['path']).write_bytes(b'changed page')
+        with patch('papershelf_pipeline.provider.Provider', EditingProvider), self.assertRaisesRegex(PipelineError, '页图'):
+            revise(repeated['manifest_path'], progress=lambda message: None)
 
 
 if __name__ == '__main__':

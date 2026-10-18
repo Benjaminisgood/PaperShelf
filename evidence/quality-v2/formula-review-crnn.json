@@ -1028,7 +1028,7 @@
     },
     {
       "id": "crnn-pruning-complete-context",
-      "instruction": "原文Figure4图注在p10-g120；后续p11-g128明确讨论Figure4b：阈值远小于1时损失不敏感，举0.01与0.5性能相同，并说明Figure5b采用0.01剪枝。因此不得把局部分块未见后文写成“全文未详述Fig4b/只有图注”。Figure5图注p11-g126结尾threshold=与紧接的p11-g127数值0.01属于同一完整图注；翻译和图表说明应保留这一值及两个来源ID。",
+      "instruction": "原文Figure4图注在p10-g120；后续p11-g128明确讨论Figure4b：阈值远小于1时损失不敏感，举0.01与0.5性能相同，并说明Figure5b采用0.01剪枝。因此不得把局部分块未见后文写成“全文未详述Fig4b/只有图注”。Figure5图注p11-g126结尾threshold=与紧接的p11-g127数值0.01属于同一完整图注；翻译和图表说明应保留这一值及两个来源ID。 同一p11-g128末句明确区分“the noisy species concentration profiles”和“the predictions using the learned CRNN model presented in Table 1”两个对象，Fig.6比较它们并称二者吻合很好。中文必须保留“含噪物种浓度曲线”与“使用表1所列CRNN模型得到的预测”的并列关系，不能合并成“模型预测的含噪浓度曲线”；也不能把含噪观测误称为模型生成的噪声预测。",
       "source_ids": [
         "p10-g120",
         "p11-g126",
@@ -1045,6 +1045,24 @@
           "11": "29c802d9bd10302335403919f8415e408bed143b977b6c4139d1e5c1af2860f4"
         },
         "method": "独立审阅者直接核对完整原文及对应原页图；此约束来源为论文自身的标题、定义或完整段落，不以模型草稿作为科学依据。"
+      }
+    }
+  ],
+  "reading_notes": [
+    {
+      "id": "crnn-ea-reader-note",
+      "text": "原页确实将Eₐ写为“activation function”。结合式4的Arrhenius指数Eₐ/(RT)，这里Eₐ通常表示活化能；原文用词疑似笔误。本阅读版保留原句，并将这个术语疑点与上下文解释分开，不能将原文称作已写明“activation energy”。",
+      "source_ids": [
+        "p5-g52"
+      ],
+      "verification": {
+        "pages": [
+          5
+        ],
+        "page_image_sha256": {
+          "5": "71a655ac3f8a3ba1caadcda4b8cec049a7cbbdd7e05b12b59bf38059262e6f6b"
+        },
+        "method": "独立审阅者核对完整PDF原页与该来源段落，区分原文表述、提取映射损伤及明确列出的解释；不改写原始来源。"
       }
     }
   ]
