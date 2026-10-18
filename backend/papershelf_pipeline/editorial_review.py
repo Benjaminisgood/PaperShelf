@@ -26,10 +26,11 @@ def load_editorial_review(path, source):
     if not isinstance(bundle.get('reviewer'), str) or not bundle['reviewer'].strip():
         raise PipelineError('校订证据缺少审阅者。')
     blocks = {item['id']: item for item in source['blocks']}
+    reading_groups = {item['id']: item for item in source.get('reading_main_blocks', [])}
     previews = {(item.get('document_id', 'main'), item['page']): item['path'] for item in source.get('figures', []) if item.get('path')}
     equation_keys = set()
     equation_aliases = {}
-    for section in ('equations', 'content_corrections', 'semantic_constraints', 'reading_notes'):
+    for section in ('equations', 'content_corrections', 'annotation_corrections', 'semantic_constraints', 'reading_notes'):
         items = bundle.get(section, [])
         if not isinstance(items, list):
             raise PipelineError(f'校订证据 {section} 必须为数组。')
@@ -38,16 +39,24 @@ def load_editorial_review(path, source):
             ids = content.get('source_ids')
             if not isinstance(ids, list) or not ids or any(identifier not in blocks for identifier in ids):
                 raise PipelineError('校订证据必须指向完整、有效的原文来源。')
+            extra_ids = item.get('additional_evidence_source_ids', [])
+            if not isinstance(extra_ids, list) or any(identifier not in blocks for identifier in extra_ids):
+                raise PipelineError('额外版面证据必须为有效原文来源数组。')
+            if extra_ids:
+                group = reading_groups.get(item.get('reading_group_id'), {})
+                if section != 'content_corrections' or item.get('section') != 'clean_reading' or set(group.get('source_ids', [])) != set(ids) or not set(extra_ids).issubset(set(group.get('linked_layout_source_ids', []))):
+                    raise PipelineError('额外版面证据必须属于当前阅读组已有的版面关联，不能引用无关片段。')
+            evidence_ids = ids + extra_ids
             verification = item.get('verification', {})
             pages = verification.get('pages')
             hashes = verification.get('page_image_sha256')
             if not isinstance(pages, list) or not pages or not isinstance(hashes, dict) or not verification.get('method'):
                 raise PipelineError('校订证据缺少页图核验记录。')
-            documents = {blocks[identifier].get('document_id', 'main') for identifier in ids}
+            documents = {blocks[identifier].get('document_id', 'main') for identifier in evidence_ids}
             if len(documents) != 1:
                 raise PipelineError('单条校订证据必须绑定同一文档。')
             document = next(iter(documents))
-            if not {blocks[identifier]['page'] for identifier in ids}.issubset(set(pages)):
+            if not {blocks[identifier]['page'] for identifier in evidence_ids}.issubset(set(pages)):
                 raise PipelineError('校订来源页不在核验页范围内。')
             for page in pages:
                 preview = previews.get((document, page))
@@ -85,8 +94,13 @@ def load_editorial_review(path, source):
                         raise PipelineError('阅读修订的关联更新须同时提供完整原值和新值。')
                 for quote in item.get('source_evidence', []):
                     block = blocks.get(quote.get('block_id')) if isinstance(quote, dict) else None
-                    if not block or block['id'] not in ids or quote.get('page') != block['page'] or not isinstance(quote.get('quote'), str) or not quote['quote'] or quote['quote'] not in block['text']:
+                    if not block or block['id'] not in evidence_ids or quote.get('page') != block['page'] or not isinstance(quote.get('quote'), str) or not quote['quote'] or quote['quote'] not in block['text']:
                         raise PipelineError('正文修订的逐字来源证据不匹配。')
+            elif section == 'annotation_corrections':
+                if item.get('field') != 'editing_notes' or not isinstance(item.get('reading_group_id'), str) or not item['reading_group_id'] or not isinstance(item.get('why'), str) or not item['why']:
+                    raise PipelineError('编辑说明修订须指定阅读组、editing_notes字段及原因。')
+                if any(not isinstance(item.get(key), list) or any(not isinstance(note, str) for note in item[key]) for key in ('original', 'corrected')):
+                    raise PipelineError('编辑说明修订须提供完整原说明与新说明文字数组。')
             elif section == 'reading_notes':
                 if not isinstance(item.get('text'), str) or not item['text'].strip():
                     raise PipelineError('正文校核说明为空。')
@@ -133,6 +147,7 @@ def _synchronize_reading_correction(item, correction, learning, bundle):
             item['editing_notes'].append(note)
     marker = {'id': correction.get('id'), 'field': correction['field'], 'reviewer': bundle['reviewer'],
               'source_sha256': bundle['source_sha256'], 'verification': copy.deepcopy(correction['verification']),
+              'additional_evidence_source_ids': list(correction.get('additional_evidence_source_ids', [])),
               'human_scientific_acceptance': False}
     if marker not in item.setdefault('source_reviewed_corrections', []):
         item['source_reviewed_corrections'].append(marker)
@@ -200,6 +215,19 @@ def apply_editorial_review(learning, source, bundle, directory, *, require_exact
             raise PipelineError(f'审校修订{correction.get("id", correction["section"])}未匹配任何原值或已修订值；已停止另存，原版本保持不变。')
         records.append({**correction, 'status': 'applied_exact_match' if locations else ('already_applied' if already else 'retained_as_grounding_constraint'),
                         'matches': len(locations), 'locations': locations, 'already_applied_locations': already})
+    for correction in bundle.get('annotation_corrections', []):
+        matches = [item for item in learning.get('clean_reading', []) if item.get('id') == correction['reading_group_id']
+                   and set(item.get('source_ids', [])) == set(correction['source_ids'])]
+        if len(matches) != 1 or matches[0].get('editing_notes', []) not in (correction['original'], correction['corrected']):
+            if require_exact:
+                raise PipelineError(f'编辑说明修订{correction.get("id", correction["reading_group_id"])}未匹配原值或已修订值。')
+            records.append({**correction, 'kind': 'annotation_correction', 'status': 'retained_as_grounding_constraint', 'locations': []})
+            continue
+        item = matches[0]
+        already = item.get('editing_notes', []) == correction['corrected']
+        item['editing_notes'] = copy.deepcopy(correction['corrected'])
+        records.append({**correction, 'kind': 'annotation_correction', 'status': 'already_applied' if already else 'applied_exact_match',
+                        'locations': [f'clean_reading[{learning["clean_reading"].index(item)}].editing_notes']})
     # Scientific caveats belong beside the affected passage as well as in the
     # equation cards. These are verified annotations, never replacement prose.
     for entry in bundle.get('reading_notes', []):

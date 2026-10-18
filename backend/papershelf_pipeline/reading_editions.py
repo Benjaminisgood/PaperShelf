@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import re
 from pathlib import Path
 
 
@@ -69,11 +70,15 @@ def render_reading_editions(source: dict, learning: dict, directory: Path) -> di
         for note in group.get('editorial_notes', []):
             output.extend(['> 原文校核：' + note['text'].replace('\n', '\n> '), '', citations(note['source_ids']), ''])
         output.extend(['<details><summary>来源与校订记录</summary>', '', citations(identifiers), ''])
-        notes = list(group.get('reading_notes', [])) + list(group.get('editing_notes', []))
-        notes.extend(note for identifier in identifiers if identifier in blocks for note in blocks[identifier].get('reading_notes', []))
-        notes.extend(note['observation'] for identifier in identifiers if identifier in blocks for note in blocks[identifier].get('layout_observations', []) if note.get('observation'))
-        for note in dict.fromkeys(notes):
+        for note in dict.fromkeys(group.get('editing_notes', [])):
             output.append('- ' + str(note))
+        extraction_notes = list(group.get('reading_notes', []))
+        extraction_notes.extend(note for identifier in identifiers if identifier in blocks for note in blocks[identifier].get('reading_notes', []))
+        extraction_notes.extend(note['observation'] for identifier in identifiers if identifier in blocks for note in blocks[identifier].get('layout_observations', []) if note.get('observation'))
+        if extraction_notes:
+            output.extend(['', '<details><summary>校订前的版面提取记录</summary>', ''])
+            output.extend('- ' + str(note) for note in dict.fromkeys(extraction_notes))
+            output.extend(['', '</details>'])
         # Machine validation is retained in learning.json. Repeating the same
         # technical receipt after every paragraph obscures the reading edition.
         output.extend(['', '</details>', ''])
@@ -100,9 +105,15 @@ def render_reading_editions(source: dict, learning: dict, directory: Path) -> di
     (directory / 'reading-content.md').write_text('\n'.join(content), encoding='utf-8')
 
     paragraphs = [f'# {learning["title"]} · 逐段对照', '', '[返回中文研读](learning.md) · [原语言全文](fulltext.md)', '']
+    group_by_id = {group['id']: group for group in groups}
     for paragraph in learning.get('paragraphs', []):
         identifiers = paragraph.get('source_ids') or [paragraph['source_id']]
-        paragraphs.extend(['## ' + identifiers[0], '', paragraph['explanation'], '', paragraph.get('reasoning', ''), '', citations(identifiers), ''])
+        explanation = paragraph['explanation']
+        if group_by_id.get(paragraph['source_id'], {}).get('kind') == 'reference':
+            # Bibliographic abbreviations can span translation units. Keep the
+            # audited units intact while displaying each reference compactly.
+            explanation = re.sub(r'\s*\n+\s*', ' ', explanation)
+        paragraphs.extend(['## ' + identifiers[0], '', explanation, '', paragraph.get('reasoning', ''), '', citations(identifiers), ''])
         for note in paragraph.get('editorial_notes', []):
             paragraphs.extend(['> 原文校核：' + note['text'].replace('\n', '\n> '), '', citations(note['source_ids']), ''])
         if paragraph.get('key_sentence'):

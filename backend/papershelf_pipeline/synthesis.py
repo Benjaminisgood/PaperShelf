@@ -128,7 +128,9 @@ editing_notes所声称的修复必须已经实际反映在text中；例如声称
 原文的阿拉伯数字逐项原样保留；unity、one、zero等文字数词在中文中也用“一”“零”等文字表达，不额外改成阿拉伯数字，以便逐项核验数字不被增加或遗漏。
 作者署名与参考文献中的Latin字母姓名在text和translation均按原文保留；不得根据拼音猜测中文姓名，不将Weiqi Ji等原文姓名改成未经原文证实的汉字身份。literal_author_names逐项原样保留在translation中。
 各组editorial_constraints是与该组canonical来源绑定的核验事实。若指出原文自身有含义、符号或定义错误，text和translation仍忠实保留原句，同时在该组editing_notes中紧邻说明原文说法、规范关系和证据边界；不能只把提醒放在别处的公式卡。例如原文称后验分布为HMC势能时，应明确说明常规势能U=-log p(theta|D)+常数，若L为对数未归一化后验则U=-L+常数，而不静默改写原句或原式。
+editing_notes只讨论本组确有的问题；不要把全篇核验规则复制到无关段落，不要留下“必须保留”“后续需修改某字段”等生成指令。相同说明在本组只写一次，科学疑点写清原文与常规关系的区别。
 中文translation须完整保留每一句的变量定义、因果关系、方法、条件、数值、单位、限定语和证据程度；不能用“本段介绍…”“定义参数A,T,b,Ea,R”等目录解说替代A、T、b、Ea、R各自的具体含义。物种浓度向量Y(t)与其时间导数（反应生成速率）必须按原文区分，不凭标题推断下段内容。输入给出translation_units时，逐项返回同顺序unit_id与完整translation，不合并、不遗漏；translation由全部单元译文顺次组成。标题按标题翻译，不能借相邻正文扩写。
+专业术语依本句语境准确翻译：神经网络参数bias译为偏置，统计bias译为偏差；activation function为激活函数，species concentration profiles通常为物种浓度曲线，不能混同空间分布或概率分布；species production rate为物种生成速率。合成数据synthetic data不等于化学合成实验数据。网络缩写展开只依本文标题与定义，不套用其他领域同名缩写。
 当前reading_groups.translation_units是唯一有效单元合同：一个单元可能包含多个句子，必须全部译在同一unit_id，不能按句号自行拆分、沿用旧稿单元编号或新增单元。旧稿只供内容比对；单元数量、ID和文本边界必须重新以本次输入为准。
 每组source_ids逐项照抄，组不能漏、合并或重复。editing_notes只记录具体校订或仍需核对的原文疑点，正文不混入编辑流程。""" + CLAIM_STRENGTH_RULES
 

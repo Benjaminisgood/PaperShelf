@@ -279,6 +279,13 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
         artifacts['learning'] = str(directory / 'learning.json')
         if not editorial_only:
             progress('对照原文重新整理中文主题、限定条件和学习条目')
+            # Revise the last reader-facing edition. The untouched draft/
+            # snapshot retains earlier raw model cards for audit; restarting
+            # from those cards can resurrect already corrected science.
+            prior_cards = learning.get('consolidated', {})
+            for key in ('methods', 'findings', 'critique', 'transfer', 'quiz', 'glossary'):
+                if isinstance(prior_cards.get(key), list):
+                    learning[key] = copy.deepcopy(prior_cards[key])
             consolidate_learning(learning, source, provider, directory, progress)
         if bundle is not None:
             from .editorial_review import apply_editorial_review

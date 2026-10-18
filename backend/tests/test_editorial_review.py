@@ -73,6 +73,71 @@ class EditorialReviewTests(unittest.TestCase):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as name, self.assertRaisesRegex(PipelineError, expected):
                 apply_editorial_review(learning, source, bundle, Path(name), require_exact=True)
 
+    def test_annotation_only_revision_removes_misplaced_note_without_changing_prose(self):
+        source, learning, _ = self.reading_fixture()
+        original = copy.deepcopy(learning)
+        bundle = {'source_sha256': 'hash', 'reviewer': 'fixture', 'annotation_corrections': [
+            {'id': 'notes', 'field': 'editing_notes', 'reading_group_id': 'a', 'source_ids': ['a'],
+             'original': original['clean_reading'][0]['editing_notes'], 'corrected': [], 'why': 'Unrelated annotation', 'verification': {}}]}
+        with tempfile.TemporaryDirectory() as name:
+            artifacts = apply_editorial_review(learning, source, bundle, Path(name), require_exact=True)
+            self.assertEqual(read_json(artifacts['editorial_review_draft']), original)
+            self.assertEqual(learning['clean_reading'][0]['editing_notes'], [])
+            for key in ('text', 'translation', 'translation_units', 'translation_validation'):
+                self.assertEqual(learning['clean_reading'][0][key], original['clean_reading'][0][key])
+            self.assertEqual(learning['editorial_review']['records'][0]['status'], 'applied_exact_match')
+            apply_editorial_review(learning, source, bundle, Path(name), require_exact=True)
+            self.assertEqual(learning['editorial_review']['records'][0]['status'], 'already_applied')
+            learning['clean_reading'][0]['editing_notes'] = ['new scientific caveat']
+            with self.assertRaisesRegex(PipelineError, '未匹配'):
+                apply_editorial_review(learning, source, bundle, Path(name), require_exact=True)
+
+    def test_source_quotes_and_annotation_shape_are_validated(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            page = root / 'page.png'
+            page.write_bytes(b'page fixture')
+            source, _, bundle = self.reading_fixture()
+            source['figures'] = [{'page': 1, 'path': str(page)}]
+            verification = {'pages': [1], 'page_image_sha256': {'1': sha256(page)}, 'method': 'fixture source review'}
+            for correction in bundle['content_corrections']:
+                correction['verification'] = verification
+                correction['source_evidence'] = [{'block_id': 'a', 'page': 1, 'quote': 'W 2 R.'}]
+            path = root / 'review.json'
+            write_json(path, bundle)
+            self.assertEqual(load_editorial_review(path, source), bundle)
+            bundle['content_corrections'][0]['source_evidence'][0]['quote'] = 'invented source'
+            write_json(path, bundle)
+            with self.assertRaisesRegex(PipelineError, '逐字来源'):
+                load_editorial_review(path, source)
+            bundle['content_corrections'] = []
+            bundle['annotation_corrections'] = [{'reading_group_id': 'a', 'field': 'editing_notes', 'source_ids': ['a'],
+                                                'original': [], 'corrected': 'not an array', 'why': 'fixture', 'verification': verification}]
+            write_json(path, bundle)
+            with self.assertRaisesRegex(PipelineError, '文字数组'):
+                load_editorial_review(path, source)
+
+    def test_inline_repair_accepts_only_existing_linked_layout_evidence(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            page = root / 'page.png'
+            page.write_bytes(b'page fixture')
+            source, _, bundle = self.reading_fixture()
+            source['blocks'].extend([{'id': 'math', 'page': 1, 'text': '∈'}, {'id': 'unrelated', 'page': 1, 'text': 'Other formula'}])
+            source['figures'] = [{'page': 1, 'path': str(page)}]
+            source['reading_main_blocks'] = [{'id': 'a', 'source_ids': ['a'], 'linked_layout_source_ids': ['math']}]
+            for item in bundle['content_corrections']:
+                item['verification'] = {'pages': [1], 'page_image_sha256': {'1': sha256(page)}, 'method': 'fixture source review'}
+                item['additional_evidence_source_ids'] = ['math']
+                item['source_evidence'] = [{'block_id': 'math', 'page': 1, 'quote': '∈'}]
+            path = root / 'review.json'
+            write_json(path, bundle)
+            self.assertEqual(load_editorial_review(path, source), bundle)
+            bundle['content_corrections'][0]['additional_evidence_source_ids'].append('unrelated')
+            write_json(path, bundle)
+            with self.assertRaisesRegex(PipelineError, '无关片段'):
+                load_editorial_review(path, source)
+
     def test_source_bound_caveat_is_visible_beside_original_and_translation_without_rewriting(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)

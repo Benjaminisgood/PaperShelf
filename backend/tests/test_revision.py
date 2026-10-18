@@ -319,6 +319,19 @@ class RevisionTests(unittest.TestCase):
             provider.assert_not_called()
         self.assertEqual(self.snapshot_run(), self.snapshot)
 
+    def test_ai_revision_uses_latest_visible_cards_without_resurrecting_old_drafts(self):
+        learning = read_json(self.previous / 'learning.json')
+        source_id = learning['methods'][0]['source_ids'][0]
+        learning['methods'][0]['body'] = 'Discarded inaccurate draft'
+        learning['consolidated'] = {'methods': [{'title': 'Reviewed method', 'body': 'The temperature was 300 K.',
+                                               'source_ids': [source_id], 'kind': 'source'}]}
+        write_json(self.previous / 'learning.json', learning)
+        result = self.perform()
+        updated = read_json(result['artifacts']['learning'])
+        self.assertEqual(updated['consolidated']['methods'][0]['body'], 'The temperature was 300 K.')
+        self.assertEqual(read_json(Path(result['run_dir']) / 'draft' / 'learning.json')['methods'][0]['body'], 'Discarded inaccurate draft')
+        self.assertEqual(read_json(self.previous / 'learning.json'), learning)
+
 
 if __name__ == '__main__':
     unittest.main()
