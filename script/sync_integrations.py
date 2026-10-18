@@ -17,7 +17,7 @@ def git(path, *arguments):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Fetch and report upstream heads (default)")
-    parser.add_argument("--update", choices=["Paper2Agent", "markitdown", "graphiti"])
+    parser.add_argument("--update", choices=["Paper2Agent", "markitdown", "graphiti", "ppt-master"])
     parser.add_argument("--ref", help="Specific fetched ref or commit; defaults to origin/default branch")
     args = parser.parse_args()
     lock = json.loads(LOCK.read_text())

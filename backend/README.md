@@ -38,6 +38,12 @@
 }
 ```
 
+可用 `"outputs": ["presentation"]` 单独生成 PPT。允许的成果名为 `guide`（HTML）、`markdown`（研读 Markdown）、`source`（完整原文 Markdown）、`dataset`（字段与证据）、`agent`、`presentation`。数组必须非空且不重复；省略时兼容原有完整研读包，不自动生成 PPT。源文档与 provenance 是共享必要输入，不意味着自动启动其他成果任务。原生界面每次仅选择一个成果，分别聚合最新可用版本。
+
+`source` 和 `agent` 创建只执行本地提取，即使请求 `mode=llm` 也不调用模型。`dataset` 使用独立字段提取与 `extraction-chunks` 缓存；`presentation` 使用独立全块汇报编排及上游原生 PPTX 导出。`guide` / `markdown` 单独请求不提取字段、不创建 Agent、不运行 Graphiti。书籍章节、校订和概览审阅保持原请求的格式选择。
+
+PPT 结果包含 `artifacts.presentation`、`presentation_preview`、`presentation_outline`、`presentation_manifest`，原始 SVG、逐页讲稿、引用记录和上游交付检查也保存在本次运行。上游锁定与更新命令见 [集成文档](../integrations/README.md)。
+
 `mode=offline` 完整保存来源与页图，执行可追溯的版面整理，生成原语言阅读版、未填写字段模板和离线检索 Agent；明确不代表 AI 校订或中文讲解。`mode=llm` 要求可用模型，生成原语言清洁正文和中文研读。服务失败、无效 JSON、阅读覆盖不完整、无法核对的引文/页码、字段类型错误或截断等未能通过校验时，保留失败记录，不把离线资料冒充 AI 成功结果。兼容 OpenAI Chat Completions 协议；本地 Ollama 等可不提供密钥。原文发送到所配置的服务，使用前选择适合数据要求的地址。
 
 字段支持 `string/number/integer/boolean/array/object`，可配置枚举、数组元素与对象属性。每条记录代表独立样品/条件组合。字段 `unit` 为期望单位提示，提取值保留模型报告的原文单位，单位不一致写入警告，禁止静默贴换单位。原文证据按来源块、页码和规范空白后逐字匹配检查；这个技术检查不保证科学解释已正确。编辑和审阅使用 `dataset-review`，保留原因、操作者与前后值历史。
@@ -113,7 +119,7 @@ HTML 是离线单文件，严格白名单过滤的 MathML 公式不需要远程�
 
 书/学位论文可设置 `"book":{"auto":true}` 从 PDF 一级书签建章，或设置 `"book":{"chapters":[{"title":"第一章","document_id":"main","start_page":1,"end_page":10},...]}`。范围必须恰覆盖全部文档页，不允许重叠或缺页；SI 文档 ID 为 s1/s2。生成 `index.html`、每章 HTML/Markdown 和 `book.json`，每章保留跨章证据链接，完整单文件学习稿仍可用。
 
-失败或取消后可在新请求加 `"resume_from":"/absolute/previous-run"` 复用先前成功分块；主文/SI 哈希、来源段落分组及其编号和文本、字段、读者背景、分块大小与服务设置必须完全匹配，并重新核验每个已有分块。版面分组改变后必须重新生成，不能把旧解释迁移到新编号。重试创建新目录，保留原失败记录。SIGTERM 取消会将 manifest/index 标记 cancelled，并保留完成的分块。可选 Graphiti/Paper2Agent 准备失败时返回 partial 与 integration_errors，本地完成的资料仍可查看。
+失败或取消后可在新请求加 `"resume_from":"/absolute/previous-run"` 复用先前成功分块；主文/SI 哈希、来源段落分组及其编号和文本、字段、读者背景和分块大小必须完全匹配；服务设置改变时重新生成，不复用旧服务分块，并重新核验每个已有分块。版面分组改变后必须重新生成，不能把旧解释迁移到新编号。重试创建新目录，保留原失败记录。SIGTERM 取消会将 manifest/index 标记 cancelled，并保留完成的分块。可选 Graphiti/Paper2Agent 准备失败时返回 partial 与 integration_errors，本地完成的资料仍可查看。
 
 综合概览与阅读路线可在生成后确定性审阅，无需再次调用模型：`python -m papershelf_pipeline summary-review --manifest /absolute/run/manifest.json --corrections /absolute/summary-corrections.json`。修正文件为数组，每项包含 `field`（`overview` 或 `reading_route`）、完整 `original`/`corrected`、`source_sha256`、`source_ids`、`actor`、`reason`。可另用 `--paragraph-corrections` 提供相同来源绑定的单段 `explanation`/`reasoning` 修正；它们会再次通过当前段落校验并同步分块与导出。命令验证已有产物哈希和精确旧值，生成新运行目录并重渲染 HTML/Markdown；原运行及模型响应不变。`summary-review.json`、`learning-before-summary-review.json` 与 `chunks/*-before-final-review.json` 保留审计；原 Graphiti/Paper2Agent 回执被复用，不重新执行集成，也不代表研究者科学验收。
 

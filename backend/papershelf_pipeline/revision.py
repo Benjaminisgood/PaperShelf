@@ -297,15 +297,19 @@ def revise(manifest_path, provider_config=None, progress=None, editorial_correct
         warnings.extend(note for note in extraction.get('warnings', []) if note not in warnings)
         write_json(directory / 'learning.json', learning)
         write_json(directory / 'extraction.json', extraction)
-        artifacts['extraction'] = str(directory / 'extraction.json')
-        artifacts.update(render_reading_editions(source, learning, directory))
-        artifacts.update(render_guide(source, learning, extraction, directory, warnings))
-        artifacts.update(export_dataset(extraction, directory, source))
-        artifacts['agent'] = create_agent(source, extraction, request, directory)
-        artifacts['mcp'] = str(directory / 'agent' / 'mcp.json')
+        outputs = set(request.get('outputs', ['guide', 'markdown', 'dataset', 'agent']))
+        formats = ({'html'} if 'guide' in outputs else set()) | ({'markdown'} if 'markdown' in outputs else set())
+        artifacts.update(render_reading_editions(source, learning, directory, learning_link='learning.md' if 'markdown' in outputs else 'learning.html'))
+        artifacts.update(render_guide(source, learning, extraction, directory, warnings, formats=formats))
+        if 'dataset' in outputs:
+            artifacts['extraction'] = str(directory / 'extraction.json')
+            artifacts.update(export_dataset(extraction, directory, source))
+        if 'agent' in outputs:
+            artifacts['agent'] = create_agent(source, extraction, request, directory)
+            artifacts['mcp'] = str(directory / 'agent' / 'mcp.json')
         if request.get('book', {}).get('enabled', True) and request.get('book'):
             from .book import render_book
-            artifacts.update(render_book(source, learning, extraction, request['book'], directory, warnings))
+            artifacts.update(render_book(source, learning, extraction, request['book'], directory, warnings, formats=formats))
         for key in ('graphiti', 'upstream_paper2agent'):
             if key in original.get('artifacts', {}):
                 old_record = Path(original['artifacts'][key])

@@ -1,5 +1,10 @@
 import Foundation
 
+public enum LearningOutput: String, CaseIterable, Codable, Identifiable, Sendable {
+    case guide, markdown, source, dataset, agent, presentation
+    public var id: String { rawValue }
+}
+
 public struct ExtractionField: Codable, Identifiable, Equatable, Sendable {
     public var id: String { name }
     public var name: String
@@ -77,6 +82,7 @@ public struct LearningRun: Codable, Identifiable, Sendable {
     public var status: String?
     public var revisionOf: String?
     public var revisionKind: String?
+    public var outputs: [String]?
     public var statusLabel: String {
         switch status {
         case "failed": return "失败"
@@ -107,6 +113,7 @@ public struct LearningRun: Codable, Identifiable, Sendable {
         if let text = value["created_at"] as? String, let date = formatter.date(from: text) { run.createdAt = date }
         run.revisionOf = value["revision_of"] as? String
         run.revisionKind = value["revision_kind"] as? String
+        run.outputs = value["outputs"] as? [String]
         return run
     }
     public init(referenceID: String, title: String, runID: String, directory: String, manifestPath: String, artifacts: [String: String], warnings: [String], mode: String, status: String = "completed") {

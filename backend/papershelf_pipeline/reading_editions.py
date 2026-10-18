@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 
-def render_reading_editions(source: dict, learning: dict, directory: Path) -> dict:
+def render_reading_editions(source: dict, learning: dict, directory: Path, *, learning_link='learning.md') -> dict:
     blocks = {item['id']: item for item in source['blocks']}
     raw = ['# 原始来源索引', '', '以下保留提取文本，不执行 AI 改写。正文对应关系见 fulltext.md。', '']
     for block in source['blocks']:
@@ -19,7 +19,7 @@ def render_reading_editions(source: dict, learning: dict, directory: Path) -> di
     cleaned = learning.get('clean_reading')
     groups = cleaned or source.get('reading_main_blocks', source.get('reading_blocks', source['blocks']))
     output = [f'# {learning["title"]}', '', '> 原语言全文阅读版。' + ('经过 AI 校订；请结合来源核验。' if cleaned else '已整理版面换行；未经过 AI 校订。'), '',
-              '[完整原始提取](source.md) · [逐块来源索引](source-index.md) · [中文研读](learning.md)', '']
+              f'[完整原始提取](source.md) · [逐块来源索引](source-index.md) · [中文研读]({learning_link})', '']
     content = [f'# {learning["title"]}', '']
     document_id = None
     def ensure_document(identifiers):
@@ -104,7 +104,7 @@ def render_reading_editions(source: dict, learning: dict, directory: Path) -> di
     # Knowledge extraction should not ingest editorial diagnostics or provenance UI.
     (directory / 'reading-content.md').write_text('\n'.join(content), encoding='utf-8')
 
-    paragraphs = [f'# {learning["title"]} · 逐段对照', '', '[返回中文研读](learning.md) · [原语言全文](fulltext.md)', '']
+    paragraphs = [f'# {learning["title"]} · 逐段对照', '', f'[返回中文研读]({learning_link}) · [原语言全文](fulltext.md)', '']
     group_by_id = {group['id']: group for group in groups}
     for paragraph in learning.get('paragraphs', []):
         identifiers = paragraph.get('source_ids') or [paragraph['source_id']]

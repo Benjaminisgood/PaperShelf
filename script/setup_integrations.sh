@@ -12,13 +12,13 @@ while [[ $# -gt 0 ]]; do
         --source-root) SOURCE_ROOT="$2"; shift 2 ;;
         --venv) VENV_PATH="$2"; shift 2 ;;
         --python) PYTHON_EXECUTABLE="$2"; shift 2 ;;
-        --help) printf '%s\n' 'Usage: setup_integrations.sh [--source-root PATH] [--venv PATH] [--python PYTHON]' 'Install the pinned MarkItDown and Graphiti sources plus the PaperShelf backend.'; exit 0 ;;
+        --help) printf '%s\n' 'Usage: setup_integrations.sh [--source-root PATH] [--venv PATH] [--python PYTHON]' 'Install the pinned integrations and PPT Master exporter plus the PaperShelf backend.'; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
     esac
 done
 SOURCE_ROOT="$(cd "$SOURCE_ROOT" && pwd)"
 VENV_PATH="${VENV_PATH:-$SOURCE_ROOT/.venv}"
-if [[ ! -f "$SOURCE_ROOT/integrations/markitdown/packages/markitdown/pyproject.toml" || ! -f "$SOURCE_ROOT/integrations/graphiti/pyproject.toml" || ! -f "$SOURCE_ROOT/integrations/Paper2Agent/skills/paper2agent/SKILL.md" ]]; then
+if [[ ! -f "$SOURCE_ROOT/integrations/markitdown/packages/markitdown/pyproject.toml" || ! -f "$SOURCE_ROOT/integrations/graphiti/pyproject.toml" || ! -f "$SOURCE_ROOT/integrations/Paper2Agent/skills/paper2agent/SKILL.md" || ! -f "$SOURCE_ROOT/integrations/ppt-master/skills/ppt-master/scripts/svg_to_pptx.py" ]]; then
     if [[ -e "$SOURCE_ROOT/.git" ]]; then
         git -C "$SOURCE_ROOT" submodule update --init --recursive
     else
@@ -38,7 +38,7 @@ import shutil, stat, sys
 source, staging = map(Path, sys.argv[1:])
 ignore = shutil.ignore_patterns('.git', '__pycache__', '*.pyc', '*.pyo', '*.egg-info',
                                 '.pytest_cache', '.mypy_cache', '.ruff_cache', 'build', 'dist')
-for relative in ('backend', 'integrations/markitdown', 'integrations/graphiti', 'integrations/Paper2Agent'):
+for relative in ('backend', 'integrations/markitdown', 'integrations/graphiti', 'integrations/Paper2Agent', 'integrations/ppt-master'):
     target = staging / relative
     shutil.copytree(source / relative, target, ignore=ignore)
 shutil.copy2(source / 'integrations/adapter-requirements.txt', staging / 'integrations/adapter-requirements.txt')
@@ -61,5 +61,6 @@ PY
     "$BUILD_SOURCE/integrations/markitdown/packages/markitdown[pdf,docx,pptx,xlsx,xls]" \
     "$BUILD_SOURCE/integrations/graphiti[falkordb]" \
     "$BUILD_SOURCE/backend"
+"$VENV_PATH/bin/python" "$SOURCE_ROOT/integrations/ppt-master/skills/ppt-master/scripts/attribution_guard.py"
 PAPERSHELF_ROOT="$SOURCE_ROOT" "$VENV_PATH/bin/python" -m papershelf_pipeline.integrations doctor
 printf '\nPython runtime installed: %s/bin/python\n' "$VENV_PATH"

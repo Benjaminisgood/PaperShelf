@@ -406,6 +406,9 @@ def make_learning(source: dict, request: dict, run_dir: Path, provider, progress
     from .learning_review import load_corrections, apply_corrections
     corrections,review_log = load_corrections(request),[]
     previous_dir = Path(request['resume_from']).expanduser().resolve() if request.get('resume_from') else None
+    if previous_dir and (previous_dir / 'request.json').is_file() and not (previous_dir / 'source.json').is_file():
+        progress('原任务在来源提取前失败，本次从完整来源重新生成所选阅读资料。')
+        previous_dir = None
     if previous_dir:
         previous_request = read_json(previous_dir/'request.json')
         previous_source = read_json(previous_dir/'source.json')
@@ -416,9 +419,12 @@ def make_learning(source: dict, request: dict, run_dir: Path, provider, progress
             raise PipelineError('resume_from 的来源段落分组或编号不同；旧译述不能映射到新的来源段落，请重新生成。')
         if reading_mode and reading_groups(previous_source) != main_groups:
             raise PipelineError('resume_from 的阅读正文分组或清理文本不同，不能复用旧的碎片化学习分块。')
-        for key,default in [('fields',[]),('reader_context',''),('chunk_characters',10000),('provider',{})]:
+        for key,default in [('fields',[]),('reader_context',''),('chunk_characters',10000)]:
             if previous_request.get(key,default)!=request.get(key,default):
                 raise PipelineError(f'resume_from 的 {key} 设置不同，不能复用学习分块。')
+        if previous_request.get('provider', {}) != request.get('provider', {}):
+            progress('模型服务配置已改变，本次重新生成所选阅读资料；旧分块保留但不复用。')
+            previous_dir = None
     for index, chunk in enumerate(chunks, 1):
         progress(f"正文重构与主题精读 {index}/{len(chunks)}（阅读组 {len(chunk)}）" if reading_mode else f"逐段讲解与字段提取 {index}/{len(chunks)}（来源块 {len(chunk)}）")
         evidence_chunk = evidence_chunks[index-1]

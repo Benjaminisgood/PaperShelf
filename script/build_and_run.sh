@@ -67,7 +67,7 @@ fi
 PIPELINE_RESOURCES="$APP_BUNDLE/Contents/Resources/Pipeline"
 mkdir -p "$PIPELINE_RESOURCES/backend" "$PIPELINE_RESOURCES/integrations" "$PIPELINE_RESOURCES/script"
 /usr/bin/rsync -a --delete --delete-excluded --exclude '__pycache__' --exclude '*.egg-info' --exclude '.pytest_cache' --exclude 'tests' "$ROOT_DIR/backend/" "$PIPELINE_RESOURCES/backend/"
-for UPSTREAM in Paper2Agent markitdown graphiti; do
+for UPSTREAM in Paper2Agent markitdown graphiti ppt-master; do
     mkdir -p "$PIPELINE_RESOURCES/integrations/$UPSTREAM"
     /usr/bin/rsync -a --delete --delete-excluded --exclude '.git' --exclude '.github' --exclude '__pycache__' --exclude '.venv' --exclude 'node_modules' "$ROOT_DIR/integrations/$UPSTREAM/" "$PIPELINE_RESOURCES/integrations/$UPSTREAM/"
 done

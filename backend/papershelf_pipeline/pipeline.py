@@ -60,7 +60,7 @@ def update_index(root,manifest):
         index_path = root / 'index.json'
         index = read_json(index_path) if index_path.exists() else {'schema_version':1,'runs':[]}
         index['runs'] = [item for item in index['runs'] if item.get('run_id')!=manifest['run_id']]
-        index['runs'].append({key:manifest.get(key) for key in ('run_id','reference_id','title','mode','quality','status','created_at','run_dir','manifest_path','artifacts','metrics','warnings')})
+        index['runs'].append({key:manifest.get(key) for key in ('run_id','reference_id','title','mode','outputs','quality','status','created_at','run_dir','manifest_path','artifacts','metrics','warnings')})
         temporary = root / f'.index-{uuid.uuid4().hex}.json'
         write_json(temporary,index)
         temporary.replace(index_path)
@@ -68,7 +68,10 @@ def update_index(root,manifest):
 
 def run(request):
     request = validate_request(dict(request))
-    provider = Provider(request.get('provider',{})) if request['mode'] == 'llm' else None
+    outputs = set(request.get('outputs', ['guide', 'markdown', 'dataset', 'agent']))
+    selective = 'outputs' in request
+    reading_requested = bool(outputs & {'guide', 'markdown'})
+    provider = None
     root = Path(request['output_root'])
     root.mkdir(parents=True,exist_ok=True)
     run_id = dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'-'+uuid.uuid4().hex[:10]
@@ -76,6 +79,8 @@ def run(request):
     directory.mkdir()
     manifest_path = directory / 'manifest.json'
     manifest = {'schema_version':1,'run_id':run_id,'reference_id':request.get('reference_id'),'title':request.get('title') or Path(request['source_path']).stem,'created_at':dt.datetime.now(dt.timezone.utc).isoformat(),'status':'running','mode':request['mode'],'quality':'source_draft' if request['mode']=='offline' else 'generated_unreviewed','run_dir':str(directory),'manifest_path':str(manifest_path),'artifacts':{},'warnings':[],'metrics':{},'source_path':request['source_path']}
+    if selective:
+        manifest['outputs'] = request['outputs']
     # Only environment variable names are accepted for secrets; preserve configuration for reproducibility.
     write_json(directory / 'request.json',request)
     write_json(manifest_path,manifest)
@@ -89,8 +94,16 @@ def run(request):
             raise PipelineCancelled('用户取消了本次生成；已保留来源和完成的分块。')
         signal.signal(signal.SIGTERM,cancel)
     try:
+        if request['mode'] == 'llm' and (outputs & {'guide', 'markdown', 'presentation'} or ('dataset' in outputs and request['fields'])):
+            provider = Provider(request.get('provider', {}))
         progress('提取完整文献与页面版面')
         source = extract_source(request,directory)
+        if request.get('resume_from'):
+            previous_source = Path(request['resume_from']).expanduser() / 'source.json'
+            if previous_source.is_file():
+                previous = read_json(previous_source)
+                if previous.get('document_set_sha256', previous['sha256']) != source.get('document_set_sha256', source['sha256']):
+                    raise PipelineError('原任务的主文献或补充材料已改变；请作为新任务生成，不能续跑旧版本。')
         progress(f'已保留 {len(source["pages"])} 页、{len(source.get("raw_blocks",source["blocks"]))} 个原始文本块；按版面重组为 {len(source["blocks"])} 个来源段落')
         book_config = request.get('book',{})
         if book_config and book_config.get('enabled',True):
@@ -108,37 +121,59 @@ def run(request):
         if source.get('canonical_markdown') is not None:
             (directory / 'markitdown.md').write_text(source['canonical_markdown'],encoding='utf-8')
             artifacts['converted_markdown'] = str(directory / 'markitdown.md')
-        learning,extraction = make_learning(source,request,directory,provider,progress)
-        from .learning_review import apply_extraction_review
-        extraction = apply_extraction_review(extraction,source,request,directory)
+        # Each target executes only its required generation. Source receipts are
+        # shared prerequisites; creating an Agent does not run semantic reading.
+        learning, extraction = make_learning(source, {**request, 'mode': 'offline', 'fields': []}, directory, None, progress)
+        if reading_requested:
+            learning, extraction = make_learning(source, request, directory, provider, progress)
+        elif 'dataset' in outputs:
+            from .selective import make_extraction
+            extraction = make_extraction(source, request, directory, provider, progress)
+        if 'dataset' in outputs:
+            from .learning_review import apply_extraction_review
+            extraction = apply_extraction_review(extraction, source, request, directory)
         if request.get('citation'):
             learning['citation'] = str(request['citation'])
         from .dataset import export_dataset, validate_extraction
-        warnings.extend(validate_extraction(extraction,source))
-        warnings.extend(extraction.get('warnings',[]))
-        write_json(directory / 'learning.json',learning)
-        write_json(directory / 'extraction.json',extraction)
-        artifacts['learning'] = str(directory / 'learning.json')
-        artifacts['extraction'] = str(directory / 'extraction.json')
+        if reading_requested or 'dataset' in outputs:
+            warnings.extend(validate_extraction(extraction, source))
+            warnings.extend(extraction.get('warnings', []))
+        if reading_requested:
+            write_json(directory / 'learning.json', learning)
+            artifacts['learning'] = str(directory / 'learning.json')
+        if reading_requested or 'dataset' in outputs:
+            # Empty schema for reading-only runs is a revision dependency, not
+            # a generated dataset exposed to the user.
+            write_json(directory / 'extraction.json', extraction)
+        if 'dataset' in outputs:
+            artifacts['extraction'] = str(directory / 'extraction.json')
         if (directory/'learning-review.json').is_file():
             artifacts['learning_review'] = str(directory/'learning-review.json')
         if (directory/'extraction-review.json').is_file():
             artifacts['extraction_review'] = str(directory/'extraction-review.json')
             artifacts['extraction_before_review'] = str(directory/'extraction-before-review.json')
-        progress('生成离线 HTML、Markdown、字段数据集与证据图谱')
-        artifacts.update(render_guide(source,learning,extraction,directory,warnings))
-        from .reading_editions import render_reading_editions
-        artifacts.update(render_reading_editions(source,learning,directory))
-        if book_config and book_config.get('enabled',True):
-            from .book import render_book
-            progress('生成全书目录与完整覆盖的章节学习稿')
-            artifacts.update(render_book(source,learning,extraction,book_config,directory,warnings))
-        artifacts.update(export_dataset(extraction,directory,source))
-        artifacts['agent'] = create_agent(source,extraction,request,directory)
-        artifacts['mcp'] = str(directory / 'agent' / 'mcp.json')
+        if reading_requested:
+            progress('生成所选阅读资料')
+            formats = ({'html'} if 'guide' in outputs else set()) | ({'markdown'} if 'markdown' in outputs else set())
+            artifacts.update(render_guide(source, learning, extraction, directory, warnings, formats=formats))
+            from .reading_editions import render_reading_editions
+            artifacts.update(render_reading_editions(source, learning, directory, learning_link='learning.md' if 'markdown' in outputs else 'learning.html'))
+            if book_config and book_config.get('enabled', True):
+                from .book import render_book
+                progress('生成全书目录与完整覆盖的章节学习稿')
+                artifacts.update(render_book(source, learning, extraction, book_config, directory, warnings, formats=formats))
+        if 'dataset' in outputs:
+            artifacts.update(export_dataset(extraction, directory, source))
+        if 'agent' in outputs:
+            artifacts['agent'] = create_agent(source, extraction, request, directory)
+            artifacts['mcp'] = str(directory / 'agent' / 'mcp.json')
+        if 'presentation' in outputs:
+            from .presentation import create_presentation
+            progress('使用 ppt-master 生成文献演示文稿')
+            artifacts.update(create_presentation(source, learning if reading_requested else {}, request, directory, provider=provider, progress=progress))
         from .integrations import create_paper2agent_bundle, graphiti_ingest
         integration_errors = {}
-        if request.get('paper2agent',{}).get('enabled'):
+        if 'agent' in outputs and request.get('paper2agent',{}).get('enabled'):
             progress('准备可追溯的 Paper2Agent 上游工作流')
             try:
                 upstream = create_paper2agent_bundle(Path(request['source_path']),directory / 'paper2agent',request['paper2agent'])
@@ -151,12 +186,12 @@ def run(request):
                     raise PipelineCancelled('用户取消了本次生成；本地资料已保留。') from error
                 integration_errors['paper2agent'] = str(error)
                 warnings.append(f'Paper2Agent 准备失败：{error}；本地学习资料已保留。')
-        if request.get('graphiti',{}).get('enabled'):
+        if (not selective or 'dataset' in outputs) and request.get('graphiti',{}).get('enabled'):
             progress('向 Graphiti 写入文献，构建时序知识图谱')
             graph_config = dict(request['graphiti'])
             graph_config.setdefault('entity_fields',request['fields'])
             try:
-                graph = graphiti_ingest(directory / 'reading-content.md',{'reference_id':request.get('reference_id'),'title':manifest['title'],'source_sha256':source['sha256'],'source_path':source['path']},graph_config)
+                graph = graphiti_ingest(directory / ('reading-content.md' if reading_requested else 'source.md'),{'reference_id':request.get('reference_id'),'title':manifest['title'],'source_sha256':source['sha256'],'source_path':source['path']},graph_config)
                 write_json(directory / 'graphiti.json',graph)
                 artifacts['graphiti'] = str(directory / 'graphiti.json')
                 manifest['graphiti'] = graph
@@ -165,7 +200,7 @@ def run(request):
                     raise PipelineCancelled('用户取消了本次生成；本地资料已保留。') from error
                 integration_errors['graphiti'] = str(error)
                 warnings.append(f'Graphiti 写入失败：{error}；本地学习资料和证据图谱已保留。')
-        metrics = {'pages':len(source['pages']),'source_blocks':len(source['blocks']),'processed_blocks':len(learning['paragraphs']) if request['mode']=='llm' else len(source['blocks']),'explained_blocks':len(learning['paragraphs']),'source_characters':sum(len(page['text']) for page in source['pages']),'page_previews':len(source['figures']),'records':len(extraction['records']),'equations':len(learning['equations']),'quiz_questions':len(learning['quiz']),'provider_calls':provider.calls if provider else 0,'provider_usage':provider.usage if provider else {}}
+        metrics = {'pages':len(source['pages']),'source_blocks':len(source['blocks']),'processed_blocks':len(learning['paragraphs']) if reading_requested and request['mode']=='llm' else len(source['blocks']),'explained_blocks':len(learning['paragraphs']),'source_characters':sum(len(page['text']) for page in source['pages']),'page_previews':len(source['figures']),'records':len(extraction['records']),'equations':len(learning['equations']),'quiz_questions':len(learning['quiz']),'provider_calls':provider.calls if provider else 0,'provider_usage':provider.usage if provider else {}}
         if cancellation_requested:
             raise PipelineCancelled('用户取消了本次生成；本地资料已保留。')
         metrics['calculations'] = len(learning.get('calculations',[]))

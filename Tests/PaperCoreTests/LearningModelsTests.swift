@@ -2,6 +2,16 @@ import XCTest
 @testable import PaperCore
 
 final class LearningModelsTests: XCTestCase {
+    func testSelectedOutputSurvivesFailureRecoveryAndHistory() throws {
+        let json = Data("""
+        {"run_id":"ppt-failed","reference_id":"paper","status":"failed","outputs":["presentation"],"error":"conversion failed"}
+        """.utf8)
+        let recovered = try XCTUnwrap(LearningRun.recover(manifest: json, directory: URL(fileURLWithPath: "/tmp/ppt-run")))
+        XCTAssertEqual(recovered.outputs, [LearningOutput.presentation.rawValue])
+        let restored = try JSONDecoder().decode(LearningRun.self, from: JSONEncoder().encode(recovered))
+        XCTAssertEqual(restored.outputs, ["presentation"])
+        XCTAssertEqual(restored.status, "failed")
+    }
     func testFieldImportDefaultsAndEnums() throws {
         let data = Data("""
         [{"name":"catalyst","type":"string","enum":["A","B"]},{"name":"temperature","type":"number","unit":"K"}]

@@ -8,6 +8,8 @@ final class LearningStore: ObservableObject {
     @Published var settings: LearningSettings
     @Published private(set) var runs: [LearningRun] = []
     @Published private(set) var busy = false
+    @Published private(set) var activeReferenceID: String?
+    @Published private(set) var activeOutput: LearningOutput?
     @Published var progress = "选择文献，生成可离线阅读的资料。"
     @Published var error: String?
     @Published var answer = ""
@@ -106,10 +108,47 @@ final class LearningStore: ObservableObject {
         try? await process?.cancelAndWait()
     }
 
-    func generate(_ reference: Reference, sourceOverride: URL? = nil, supplements: [URL] = [], bookJSON: String? = nil, resumeFrom: String? = nil) {
+    func generate(_ reference: Reference, sourceOverride: URL? = nil, supplements: [URL] = [], bookJSON: String? = nil, resumeFrom: String? = nil, output: LearningOutput? = nil) {
         guard !busy else { return }
         busy = true; error = nil; answer = ""
+        activeReferenceID = reference.id.uuidString; activeOutput = output
         var configuration = settings
+        var priorRequest: [String: Any]?
+        var selectedOutputs = output.map { [$0.rawValue] }
+        do {
+            if let resumeFrom {
+                let url = URL(fileURLWithPath: resumeFrom).appendingPathComponent("request.json")
+                let saved = try object(String(contentsOf: url, encoding: .utf8))
+                guard saved["reference_id"] as? String == reference.id.uuidString,
+                      saved["source_path"] is String else { throw LearningError.message("原任务与当前文献不匹配，无法续跑。") }
+                if let outputs = saved["outputs"] {
+                    guard let names = outputs as? [String], !names.isEmpty,
+                          names.allSatisfy({ LearningOutput(rawValue: $0) != nil }) else {
+                        throw LearningError.message("原任务成果类型无效，无法续跑。")
+                    }
+                    selectedOutputs = names
+                } else { selectedOutputs = nil }
+                priorRequest = saved
+                configuration.mode = saved["mode"] as? String ?? "offline"
+                configuration.readerContext = saved["reader_context"] as? String ?? ""
+                configuration.chunkCharacters = saved["chunk_characters"] as? Int ?? 10000
+                configuration.fields = try JSONDecoder().decode([ExtractionField].self, from: JSONSerialization.data(withJSONObject: saved["fields"] ?? []))
+                configuration.graphitiJSON = prettyJSON(saved["graphiti"] as? [String: Any] ?? [:])
+                configuration.paper2agentJSON = prettyJSON(saved["paper2agent"] as? [String: Any] ?? [:])
+                activeOutput = selectedOutputs?.count == 1 ? selectedOutputs?.first.flatMap(LearningOutput.init(rawValue:)) : nil
+            }
+        } catch {
+            self.error = error.localizedDescription; busy = false; return
+        }
+        // Local preparation does not need model credentials. Keep the provider
+        // settings in Agent bundles for future, explicitly requested questions.
+        if let selectedOutputs {
+            if Set(selectedOutputs).isSubset(of: ["source", "agent"]) { configuration.mode = "offline" }
+            configuration.graphitiJSON = "{}"
+            if !selectedOutputs.contains("agent") { configuration.paper2agentJSON = "{}" }
+            if !selectedOutputs.contains("dataset") { configuration.fields = [] }
+            if Set(selectedOutputs) == ["dataset"] && configuration.fields.isEmpty { configuration.mode = "offline" }
+        }
         configuration.pythonPath = pythonPath; configuration.backendPath = backendPath
         operation = Task {
             defer { recoverHistory(); busy = false; client = nil; operation = nil; startNext() }
@@ -117,10 +156,14 @@ final class LearningStore: ObservableObject {
                 guard persistenceAvailable else { throw LearningError.message("研读历史损坏，已停止写入；请先检查 history.json。") }
                 try ExtractionField.validate(configuration.fields)
                 let work = try workDirectory()
-                let url = try sourceOverride ?? PDFLinks.resolvedURL(for: reference)
+                let resumedSource = (priorRequest?["source_path"] as? String).map { URL(fileURLWithPath: $0) }
+                let url = try resumedSource ?? sourceOverride ?? PDFLinks.resolvedURL(for: reference)
+                let selectedSupplements = priorRequest.map { saved in
+                    (saved["supplementary_paths"] as? [String] ?? []).map { URL(fileURLWithPath: $0) }
+                } ?? supplements
                 let scope = url.startAccessingSecurityScopedResource()
                 defer { if scope { url.stopAccessingSecurityScopedResource() } }
-                let supplementaryScopes = supplements.map { ($0, $0.startAccessingSecurityScopedResource()) }
+                let supplementaryScopes = selectedSupplements.map { ($0, $0.startAccessingSecurityScopedResource()) }
                 defer { for (url, granted) in supplementaryScopes where granted { url.stopAccessingSecurityScopedResource() } }
                 guard FileManager.default.fileExists(atPath: url.path) else { throw PDFLinkError.missing }
                 progress = "正在准备全文与页码…"
@@ -136,26 +179,35 @@ final class LearningStore: ObservableObject {
                     "reference_id": reference.id.uuidString, "title": reference.title, "reader_context": configuration.readerContext,
                     "mode": configuration.mode, "fields": try JSONSerialization.jsonObject(with: JSONEncoder().encode(configuration.fields)),
                     "chunk_characters": configuration.chunkCharacters, "provider": try providerConfiguration(configuration)]
-                request["supplementary_paths"] = supplements.map(\.path)
+                if let priorRequest {
+                    // Restore source-specific options and exact output selection;
+                    // only the current provider may change to repair connectivity.
+                    request = priorRequest.merging(request) { _, current in current }
+                    request.removeValue(forKey: "source_pages_path")
+                }
+                request["supplementary_paths"] = selectedSupplements.map(\.path)
+                if let selectedOutputs { request["outputs"] = selectedOutputs }
+                request["citation"] = [reference.title, reference.authors.joined(separator: ", "), reference.year, reference.doi].filter { !$0.isEmpty }.joined(separator: " · ")
                 if let resumeFrom { request["resume_from"] = resumeFrom }
-                if let bookJSON { request["book"] = try object(bookJSON) }
+                if priorRequest == nil, let bookJSON { request["book"] = try object(bookJSON) }
                 if FileManager.default.fileExists(atPath: pages.path) { request["source_pages_path"] = pages.path }
                 let graph = try object(configuration.graphitiJSON)
-                if !graph.isEmpty { request["graphiti"] = graph }
+                request["graphiti"] = graph
                 let p2a = try object(configuration.paper2agentJSON)
-                if !p2a.isEmpty { request["paper2agent"] = p2a }
+                request["paper2agent"] = p2a
                 let requestURL = work.appendingPathComponent("request.json")
                 try JSONSerialization.data(withJSONObject: request, options: [.prettyPrinted, .sortedKeys]).write(to: requestURL, options: .atomic)
                 let result = try await invoke(["run", "--request", requestURL.path], work: work, configuration: configuration)
                 guard let status = result["status"] as? String, ["completed", "partial"].contains(status), let runID = result["run_id"] as? String,
                       let directory = result["run_dir"] as? String, let manifest = result["manifest_path"] as? String,
                       let artifacts = result["artifacts"] as? [String: String] else { throw LearningError.message("后端结果格式不完整，请查看处理日志。") }
-                let run = LearningRun(referenceID: reference.id.uuidString, title: reference.title, runID: runID, directory: directory,
+                var run = LearningRun(referenceID: reference.id.uuidString, title: reference.title, runID: runID, directory: directory,
                     manifestPath: manifest, artifacts: artifacts, warnings: result["warnings"] as? [String] ?? [], mode: configuration.mode, status: status)
+                run.outputs = result["outputs"] as? [String]
                 var updated = runs; updated.insert(run, at: 0)
                 try JSONEncoder().encode(updated).write(to: root.appendingPathComponent("history.json"), options: .atomic)
                 runs = updated
-                progress = status == "partial" ? "本地资料已生成，部分集成未完成；请查看缺口提示。" : configuration.mode == "offline" ? "原文整理草稿已生成，可查看 HTML、Markdown 和证据。" : "学习资料已生成，请核对证据和缺口。"
+                progress = status == "partial" ? "本地资料已生成，部分集成未完成；请查看缺口提示。" : "所选资料已生成，已保留为独立版本。"
             } catch is CancellationError { progress = "已取消，历史产物保留。" }
             catch { self.error = error.localizedDescription; progress = "处理未完成；日志与历史产物保留。" }
         }
@@ -164,6 +216,7 @@ final class LearningStore: ObservableObject {
     func revise(_ run: LearningRun, reference: Reference, retry: Bool = false) {
         guard !busy else { return }
         busy = true; error = nil; answer = ""
+        activeReferenceID = reference.id.uuidString; activeOutput = nil
         var configuration = settings
         configuration.mode = "llm"
         configuration.pythonPath = pythonPath; configuration.backendPath = backendPath
@@ -195,6 +248,7 @@ final class LearningStore: ObservableObject {
     func ask(_ query: String, run: LearningRun) {
         guard !busy, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         busy = true; error = nil; answer = ""; answerRunID = run.id
+        activeReferenceID = run.referenceID; activeOutput = .agent
         var configuration = settings
         configuration.pythonPath = pythonPath; configuration.backendPath = backendPath
         operation = Task {
@@ -213,9 +267,10 @@ final class LearningStore: ObservableObject {
         }
     }
 
-    func command(_ arguments: [String]) {
+    func command(_ arguments: [String], referenceID: String? = nil, output: LearningOutput? = nil) {
         guard !busy else { return }
         busy = true; error = nil
+        activeReferenceID = referenceID; activeOutput = output
         operation = Task {
             defer { busy = false; client = nil; operation = nil; startNext() }
             do { diagnostics = prettyJSON(try await invoke(arguments, work: try workDirectory())); progress = "集成命令已返回。" }
@@ -227,6 +282,7 @@ final class LearningStore: ObservableObject {
     func probeProvider(models: Bool = false) {
         guard !busy else { return }
         busy = true; error = nil
+        activeReferenceID = nil; activeOutput = nil
         var configuration = settings
         configuration.pythonPath = pythonPath; configuration.backendPath = backendPath
         operation = Task {
@@ -245,7 +301,8 @@ final class LearningStore: ObservableObject {
 
     func applyReview(_ data: Data, actor: String, extractionPath: String, run: LearningRun) async throws -> String {
         guard !busy else { throw LearningError.message("请等待当前任务结束。") }
-        busy = true
+        busy = true; error = nil
+        activeReferenceID = run.referenceID; activeOutput = .dataset
         defer { busy = false; client = nil; startNext() }
         let directory = URL(fileURLWithPath: run.directory).appendingPathComponent("Reviews/\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -294,7 +351,8 @@ final class LearningStore: ObservableObject {
 
     func queryGraph(_ query: String, filters: String, run: LearningRun, remote: Bool) async throws -> String {
         guard !busy else { throw LearningError.message("请等待当前任务结束。") }
-        busy = true
+        busy = true; error = nil
+        activeReferenceID = run.referenceID; activeOutput = .dataset
         defer { busy = false; client = nil; startNext() }
         let work = try workDirectory()
         let arguments: [String]
@@ -313,12 +371,13 @@ final class LearningStore: ObservableObject {
 
     func upstreamAction(_ action: String, run: LearningRun) {
         let job = URL(fileURLWithPath: run.directory).appendingPathComponent("paper2agent").path
-        command(["paper2agent-\(action)", job])
+        command(["paper2agent-\(action)", job], referenceID: run.referenceID, output: .agent)
     }
 
     func installRuntime() {
         guard !busy else { return }
         busy = true; error = nil; progress = "正在安装文档与图谱依赖…"
+        activeReferenceID = nil; activeOutput = nil
         operation = Task {
             defer { busy = false; client = nil; operation = nil; startNext() }
             do {
@@ -342,6 +401,7 @@ final class LearningStore: ObservableObject {
     func graphService(_ action: String) {
         guard !busy, ["start", "status", "stop"].contains(action) else { return }
         busy = true; error = nil
+        activeReferenceID = nil; activeOutput = nil
         let source = URL(fileURLWithPath: backendPath).deletingLastPathComponent()
         operation = Task {
             defer { busy = false; client = nil; operation = nil; startNext() }

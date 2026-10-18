@@ -7,3 +7,6 @@
 [submodule "integrations/graphiti"]
 	path = integrations/graphiti
 	url = https://github.com/getzep/graphiti.git
+[submodule "integrations/ppt-master"]
+	path = integrations/ppt-master
+	url = https://github.com/hugohe3/ppt-master.git
