@@ -19,11 +19,11 @@
     },
     {
       "bundle": "evidence/quality-v2/formula-review-bcrnn.json",
-      "sha256": "56da7f8d55a6a1feb51ca876bb4f5fdc0da8bfa85fc0058ff4931b8d8d59f15e",
+      "sha256": "d005d98d2e346e710319fd50f499c83b037ef680f75ea6f27a2add537cbfbb74",
       "equations": 31,
       "content_corrections": 6,
       "semantic_constraints": 11,
-      "reading_notes": 3,
+      "reading_notes": 5,
       "bundle_ids_unique": true,
       "normalized_equation_keys_unique": true,
       "alias_ownership_unique": true,

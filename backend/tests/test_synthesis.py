@@ -99,6 +99,51 @@ class SynthesisTests(unittest.TestCase):
         self.assertEqual(correction['original_source_ids'],['p1-b1'])
         self.assertEqual(correction['evidence'][0]['quote'],self.blocks[1]['text'])
 
+    def test_consolidation_empty_sections_use_empty_schema_and_report_all_extras(self):
+        learning={'methods':[{'title':'条件','body':'完整保留条件。','source_ids':['p1-b1'],'kind':'source'}]}
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt);output=chunk_response(request)
+                if 'items' in request:
+                    calls.append(request)
+                    if len(calls)==1:
+                        output['findings']=[{'title':'多余结果','body':'不属于本批。','source_ids':['p1-b1']}]
+                        output['glossary']=[{'term':'多余术语','definition':'不属于本批。','source_ids':['p1-b1']}]
+                return output
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'chunks').mkdir()
+            consolidate_learning(learning,self.source,Provider(),root,lambda _:None)
+        self.assertEqual(calls[0]['allowed_sections'],['methods'])
+        self.assertTrue(all(calls[0]['schema'][key]==[] for key in calls[0]['empty_sections']))
+        self.assertIn('findings',calls[1]['validation_error'])
+        self.assertIn('glossary',calls[1]['validation_error'])
+
+    def test_consolidation_resume_revalidates_completed_batch_with_identical_input(self):
+        initial={'methods':[{'title':'条件','body':'完整保留条件。','source_ids':['p1-b1'],'kind':'source'}]}
+        for changed in (False,True):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as folder:
+                base=Path(folder);prior=base/'prior';current=base/'current'
+                (prior/'chunks').mkdir(parents=True);(current/'chunks').mkdir(parents=True)
+                (prior/'source.json').write_text(json.dumps(self.source))
+                (prior/'chunks/chunk-0001.json').write_text(json.dumps(initial))
+                class InitialProvider:
+                    def json(self,system,prompt):return chunk_response(json.loads(prompt))
+                consolidate_learning(copy.deepcopy(initial),self.source,InitialProvider(),prior,lambda _:None)
+                (current/'request.json').write_text(json.dumps({'resume_from':str(prior)}))
+                active=copy.deepcopy(self.source)
+                if changed:active['editorial_review_context']={'semantic_constraints':[]}
+                calls=[]
+                class Provider:
+                    def json(self,system,prompt):
+                        request=json.loads(prompt)
+                        if 'items' in request:calls.append(request)
+                        return chunk_response(request)
+                consolidate_learning(copy.deepcopy(initial),active,Provider(),current,lambda _:None)
+                self.assertEqual(len(calls),int(changed))
+                saved=json.loads((current/'chunks/consolidation-1.json').read_text())
+                self.assertEqual(bool(saved['_resumed_from']),not changed)
+
     def test_grounded_gap_review_resolves_later_provided_evidence_without_losing_draft(self):
         learning={'overview':'旧概览','reading_route':['旧路线'],'gaps':['局部草稿声称未报告速率常数。']}
         class Provider:
@@ -294,6 +339,18 @@ class SynthesisTests(unittest.TestCase):
         item['editing_notes']=['尚未修复 differ-ences 为 differences，仍待核对。']
         validate_reading({'clean_reading':[item]},[group],[],check_themes=False)
 
+    def test_inline_formula_projection_remains_an_unresolved_literal_marker(self):
+        text='The vector ⟦inline formula⟧ contains ⟦inline symbol: ~yi j⟧.'
+        group={'id':'g1','source_ids':['g1'],'text':text,'kind':'body','page':1,'pages':[1]}
+        item={'id':'g1','source_ids':['g1'],'text':text,'translation':'向量⟦inline formula⟧包含⟦inline symbol: ~yi j⟧。','editing_notes':[]}
+        validate_reading({'clean_reading':[item]},[group],[],check_themes=False)
+        validate_polished_translation(item,group)
+        changed={**item,'text':text.replace('⟦inline symbol: ~yi j⟧','theta')}
+        with self.assertRaisesRegex(PipelineError,'inline'):
+            validate_reading({'clean_reading':[changed]},[group],[],check_themes=False)
+        with self.assertRaisesRegex(PipelineError,'inline'):
+            validate_polished_translation({**item,'translation':'向量和theta。'},group)
+
     def test_polish_retries_only_invalid_groups_with_complete_linked_evidence(self):
         groups=[{'id':'g1','source_ids':['g1'],'text':'The value is unity.','kind':'body','page':1,'pages':[1],
                  'linked_layout_source_ids':['fragment'],'inline_projections':[{'literal_prose_tail':{'source_id':'fragment','text':'in'}}]},
@@ -339,6 +396,32 @@ class SynthesisTests(unittest.TestCase):
                 saved=json.loads((current/'chunks/polish-0001.json').read_text())
                 self.assertEqual(bool(saved['resumed_from']),change in {'none','invalid'})
                 self.assertEqual(len(saved['input_sha256']),64)
+
+    def test_polish_unit_retry_removes_obsolete_metadata_but_keeps_full_draft(self):
+        text=('Gaussian distribution is only assumed on W and k. The Bayesian model results are illustrated in the figure. '
+              'The concentration remains almost constant and unity because the species is a pure catalyst.')
+        group={'id':'g1','source_ids':['g1'],'text':text,'kind':'body','page':1,'pages':[1]}
+        source={'blocks':[{'id':'g1','page':1,'text':text}],'reading_main_blocks':[group]}
+        units=polish_translation_units(group)
+        good=[{'unit_id':u['id'],'translation':'完整直译：'+u['text']} for u in units]
+        old=good+[{'unit_id':'g1-t999','translation':'不应存在的旧单元。'}]
+        draft={'id':'g1','source_ids':['g1'],'text':text,'translation':'完整旧译文供逐句比对。','translation_units':old,'editing_notes':[]}
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt);calls.append(request)
+                return {'clean_reading':[{**draft,'translation_units':old if len(calls)==1 else good}]}
+        with tempfile.TemporaryDirectory() as folder:
+            polish_reading(source,{'clean_reading':[draft]},Provider(),Path(folder),lambda _:None)
+            invalid=json.loads((Path(folder)/'chunks/polish-0001-invalid-1.json').read_text())
+            self.assertEqual(invalid['provider_response']['clean_reading'][0]['translation_units'],old)
+        self.assertEqual(len(calls),2)
+        self.assertNotIn('translation_units',calls[0]['existing_reading'][0])
+        self.assertNotIn('translation_units',calls[1]['invalid_reading'][0])
+        self.assertEqual(calls[1]['invalid_reading'][0]['translation'],draft['translation'])
+        self.assertIn('expected=',calls[1]['validation_errors']['g1'])
+        self.assertIn('g1-t999',calls[1]['validation_errors']['g1'])
+        self.assertEqual(draft['translation_units'],old)
 
     def test_raw_evidence_cannot_override_clean_paragraph_anchor(self):
         # The real CRNN extraction contains punctuation whitespace that the

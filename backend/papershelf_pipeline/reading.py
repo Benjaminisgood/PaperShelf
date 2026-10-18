@@ -236,7 +236,7 @@ def _can_continue_reading(previous, current, metrics, *, floating_blocks=()):
         run_in_heading = (re.match(r'^\d+(?:\.\d+)+\s+', first)
                           and re.search(r'\.\s+(?:The|A|An|Rather|We)\b', first))
         open_function_word = re.search(r'\b(?:a|an|the|of|in|for|with|by|to|and|or)\s*$', first, re.I)
-        capital_continuation = bool(re.match(r'[A-Z][a-z]', second) and (run_in_heading or open_function_word))
+        capital_continuation = bool(re.match(r'(?:[A-Z][a-z]|[A-Z]{2,}\b)', second) and (run_in_heading or open_function_word))
         if re.search(r'[.!?。！？][\d,–—\-\]”"\')]*$', first) or not (re.match(r'[a-z\u3400-\u9fff]', second) or capital_continuation):
             return False
     elif re.match(r'^(?:\(\d{1,3}\)|\[\d{1,3}\]|\d{1,3}[.)]?)\s+[A-Z]', second):
@@ -278,15 +278,34 @@ def _can_continue_reading(previous, current, metrics, *, floating_blocks=()):
 
 def _inline_fragment_position(previous, current, fragments, metrics):
     """Locate small inline glyph boxes beside a prose line, without decoding."""
-    if not fragments or not _can_continue_reading(previous, current, metrics):
+    if not fragments:
         return None
     if _document_page(previous) != _document_page(current):
         return None
     size = _reading_font(previous)
+    if abs(size - _reading_font(current)) > max(.7, size * .10):
+        return None
     if any(_document_page(fragment) != _document_page(previous) or not fragment.get('bbox')
            or fragment.get('source_role_hint') == 'marginal' for fragment in fragments):
         return None
-    a, b = previous['bbox'], current['bbox']
+    a, b = previous.get('bbox'), current.get('bbox')
+    if not a or not b or previous.get('grouping_notes') or current.get('grouping_notes'):
+        return None
+    last_line = previous.get('lines', [])[-1].get('bbox', a) if previous.get('lines') else a
+    # A formula may split one physical line into prose on its left and a
+    # punctuation-led continuation on its right. Row overlap and intervening
+    # glyph boxes distinguish this from a caption or the next column.
+    same_line = (previous.get('reading_role') == current.get('reading_role') == 'body'
+                 and re.match(r'^[.,;:!?]\s+[A-Z]', current.get('reading_text', ''))
+                 and abs(b[1] - last_line[1]) <= size * .5
+                 and last_line[2] - size * .5 <= b[0] <= last_line[2] + size * 5
+                 and all(last_line[2] - size <= fragment['bbox'][0] <= b[0]
+                         and abs(fragment['bbox'][1] - last_line[1]) <= size
+                         for fragment in fragments))
+    if same_line:
+        return 'after_previous'
+    if not _can_continue_reading(previous, current, metrics):
+        return None
     if all(fragment['bbox'][0] >= a[2] - size
            and a[3] - size * 1.5 <= fragment['bbox'][1] <= a[3] + size
            and fragment['bbox'][3] <= a[3] + size * 1.5 for fragment in fragments):
@@ -298,6 +317,39 @@ def _inline_fragment_position(previous, current, fragments, metrics):
     return None
 
 
+def _caption_continuation(previous, current, first, fragments):
+    """Recognize a caption split by inline math or a wrapped panel label."""
+    if previous.get('reading_role') != 'caption' or current.get('reading_role') != 'body':
+        return None
+    if _document_page(previous) != _document_page(current) or previous.get('grouping_notes') or current.get('grouping_notes'):
+        return None
+    a, b, start = previous.get('bbox'), current.get('bbox'), first.get('bbox')
+    if not a or not b or not start or current.get('source_role_hint') == 'marginal':
+        return None
+    size = _reading_font(previous)
+    if abs(size - _reading_font(current)) > max(.5, size * .07):
+        return None
+    text, following = previous['reading_text'].rstrip(), current['reading_text'].lstrip()
+    if not text or re.search(r'[.!?。！？][”"\')\]]*$', text):
+        return None
+    last_line = previous.get('lines', [])[-1].get('bbox', a) if previous.get('lines') else a
+    if (fragments and len(re.findall(r'[A-Za-z]{3,}', following)) >= 6
+            and abs(b[1] - last_line[1]) <= size * .5
+            and last_line[2] - size <= b[0] <= last_line[2] + size * 2
+            and b[2] > last_line[2] + size * 5
+            and all(_document_page(fragment) == _document_page(current) and fragment.get('bbox')
+                    and abs(fragment['bbox'][1] - last_line[1]) <= size
+                    and last_line[2] - size * 2 <= fragment['bbox'][0] <= b[0] + size
+                    for fragment in fragments)):
+        return 'same_line'
+    if (not fragments and text.endswith(']') and re.match(r'^\([a-z]\)\s+and\b', following)
+            and abs(b[0] - start[0]) <= size * .7
+            and a[3] - size * .25 <= b[1] <= a[3] + size * 1.5
+            and 0 < b[3] - b[1] <= size * 1.7):
+        return 'panel_label_next_line'
+    return None
+
+
 def _inline_prose_tail(fragments):
     """Copy a literal prose suffix mixed into the last inline formula block."""
     fragment = fragments[-1]
@@ -306,6 +358,40 @@ def _inline_prose_tail(fragments):
         return {'source_id': fragment['id'], 'text': match.group().strip(),
                 'raw_start': match.start(), 'raw_end': match.end()}
     return None
+
+
+def _inline_symbol_prefix(previous, current):
+    """Link a literal 'where <glyph>' prefix split from its inline subscript.
+
+    The text layer may encode theta as ``~yi`` and emit its subscript ``j``
+    with the following prose. Keep those exact encodings inside a marker;
+    never infer the intended Greek letter or superscript/subscript semantics.
+    """
+    if (previous is None or previous.get('reading_role') != 'layout_fragment'
+            or current.get('reading_role') != 'body' or _document_page(previous) != _document_page(current)
+            or previous.get('grouping_notes') or current.get('grouping_notes')):
+        return None
+    prefix = re.fullmatch(r'\s*(where)\s+([^\s]+)\s*', previous['text'])
+    suffix = re.match(r'^([A-Za-z])\s+(?:is|are|denotes|represents)\b', current['reading_text'])
+    if not prefix or not suffix or not re.search(r'[~∼𝑎-𝟿]', prefix[2]):
+        return None
+    a, b = previous.get('bbox'), current.get('bbox')
+    size = _reading_font(previous)
+    if (not a or not b or abs(size - _reading_font(current)) > max(.7, size * .10)
+            or abs(a[1] - b[1]) > size * .5 or not a[2] - size * .5 <= b[0] <= a[2] + size
+            or b[0] < a[0] + size or b[2] < a[2] + size * 5):
+        return None
+    raw_suffix = re.match(r'\s*([A-Za-z])\s+(?:is|are|denotes|represents)\b', current['text'])
+    if not raw_suffix:
+        return None
+    marker = f'⟦inline symbol: {prefix[2]} {suffix[1]}⟧'
+    projection = {'before_source_id': current['id'], 'marker': marker, 'layout_source_ids': [previous['id']],
+                  'literal_prose_prefix': {'source_id': previous['id'], 'text': prefix[1],
+                                           'raw_start': prefix.start(1), 'raw_end': prefix.end(1)},
+                  'literal_symbol_parts': [
+                      {'source_id': previous['id'], 'text': prefix[2], 'raw_start': prefix.start(2), 'raw_end': prefix.end(2)},
+                      {'source_id': current['id'], 'text': raw_suffix[1], 'raw_start': raw_suffix.start(1), 'raw_end': raw_suffix.end(1)}]}
+    return prefix[1] + ' ' + marker + current['reading_text'][suffix.end(1):], projection
 
 
 def _can_continue_numeric(previous, current, role):
@@ -428,9 +514,42 @@ def apply_reading_layer(source):
             # Page furniture can interrupt the physical block list, but does
             # not interrupt a supported page/column continuation.
             continue
+        symbol_prefix = _inline_symbol_prefix(previous, block)
+        if symbol_prefix:
+            text, projection = symbol_prefix
+            edits.append({'kind': 'inline_symbol_prefix', 'before': block['reading_text'], 'after': text,
+                          'basis': 'same_baseline_literal_source_fragments_without_symbol_decoding'})
+            notes.append('同一文字行的 where 与数学符号被文本层拆开；按原字形编码标记并链接来源，未推断希腊字母或上下标。')
+            block.update(reading_text=text, reading_edits=edits, reading_notes=notes)
+            entry.update(text=text, reading_text=text, reading_notes=list(notes),
+                         linked_layout_source_ids=projection['layout_source_ids'], inline_projections=[projection])
         continuation = numeric_continuation or (previous is not None and _can_continue_reading(previous, block, metrics))
         group, joined_from, skipped_fragments, skipped_captions = previous_group, previous, [], []
         inline_position, inline_tail = None, None
+        caption_continuation = None
+        if not continuation and role == 'body':
+            candidate = len(groups) - 1
+            caption_fragments = []
+            while candidate >= 0 and groups[candidate]['kind'] in {'equation_fragment', 'layout_fragment'}:
+                caption_fragments[0:0] = groups[candidate]['source_ids']
+                candidate -= 1
+            if candidate >= 0 and groups[candidate]['kind'] == 'caption':
+                proposed = groups[candidate]
+                last = by_id[proposed['source_ids'][-1]]
+                caption_fragments = [identifier for identifier in caption_fragments
+                                     if source_order[identifier] > source_order[last['id']]]
+                caption_continuation = _caption_continuation(last, block, by_id[proposed['source_ids'][0]],
+                                                             [by_id[identifier] for identifier in caption_fragments])
+                if caption_continuation:
+                    role = 'caption'
+                    block['reading_role'] = role
+                    entry.update(kind=role, role=role, reading_role=role)
+                    notes.append('同页同字号的图注在行内公式或面板标记处续接；数值与原始符号不变。')
+                    block['reading_notes'] = notes
+                    continuation, group, joined_from = True, proposed, last
+                    skipped_fragments = caption_fragments
+                    if caption_fragments:
+                        inline_position = 'after_previous'
         if not continuation and role == 'body':
             # A float or inline glyph can interrupt the extraction order while
             # the surrounding prose is still a single unfinished sentence.
@@ -485,6 +604,7 @@ def apply_reading_layer(source):
             group['pages'] = list(dict.fromkeys(group['pages'] + [block['page']]))
             group['reading_notes'] = list(dict.fromkeys(group['reading_notes'] + notes + join_notes))
             basis = ('numeric_continuation_after_equals_and_matching_layout' if numeric_continuation else
+                     'caption_continuation_matching_layout' if caption_continuation else
                      'unfinished_sentence_across_floating_caption' if skipped_captions else
                      'unfinished_sentence_across_inline_math' if inline_position else 'unfinished_sentence_and_matching_layout')
             group.setdefault('joins', []).append({'from': joined_from['id'], 'to': block['id'], 'basis': basis, 'edits': join_edits})

@@ -92,6 +92,9 @@ def validate_reading(value: dict, groups: list[dict], sources: list[dict], *, ch
         for formula in re.findall(r'\$\$.*?\$\$|\$[^$]+\$|\\\[.*?\\\]|\\\(.*?\\\)', group['text'], re.S):
             if normalize_quote(formula) not in normalize_quote(text):
                 raise PipelineError(f'clean_reading {group["id"]} 缺少原始数学片段；请保留原式。')
+        marker_pattern = r'⟦(?:inline formula|inline symbol:[^⟧]*)⟧'
+        if Counter(re.findall(marker_pattern,text)) != Counter(re.findall(marker_pattern,group['text'])):
+            raise PipelineError(f'clean_reading {group["id"]} 改动了尚未重建的inline公式/字形标记；须逐字保留，不能猜补原式。')
         units = r'(?<![A-Za-z])(?:mol|mmol|kcal|kJ|Pa|kPa|MPa|Hz|MHz|K|°C|%)(?![A-Za-z])'
         if Counter(re.findall(units, text)) != Counter(re.findall(units, group['text'])):
             raise PipelineError(f'clean_reading {group["id"]} 改变了原文单位，不能静默换算或漏写。')
@@ -121,10 +124,12 @@ editorial_review_context是绑定文献SHA的公式/语义核验记录，只作�
 明显的英文词内断行必须修复，即使文内没有另一处完整拼写，也可根据标准英语拼写、词形和当前句法确定，例如predict-ability应为predictability、challen-ging应为challenging、environ-mental应为environmental。不要仅因“没有文内完整词例”保留这些明确错误。正常复合词、专名或确有歧义的连字符应保留并说明，不对科学公式进行拼写修复。
 editing_notes所声称的修复必须已经实际反映在text中；例如声称differ-ences改为differences、generat-ing改为generating时，text不能仍保留原断词。未完成的修改必须标为仍待核对，不能宣称已修复。
 保留全部科学内容、数字和正负号、上下标、化学计量、单位、条件、原式及原文的论断强度。不得换算数值或单位，不把time unit补成秒或无量纲，不从常识修补乱码运算符或猜改数学/化学符号。公式疑点保留原式并在editing_notes说明，kind为equation/formula/math的组仅允许空白整理。不得删除或改写未映射字形标记来伪装公式已可靠重建。
+⟦inline formula⟧和⟦inline symbol: ...⟧是尚未可靠重建的原文公式/字形占位，text和translation须逐字保留；linked_layout_source_ids和inline_projections提供其完整来源，不代表公式已恢复，不能猜补希腊字母、运算符或上下标。
 原文的阿拉伯数字逐项原样保留；unity、one、zero等文字数词在中文中也用“一”“零”等文字表达，不额外改成阿拉伯数字，以便逐项核验数字不被增加或遗漏。
 作者署名与参考文献中的Latin字母姓名在text和translation均按原文保留；不得根据拼音猜测中文姓名，不将Weiqi Ji等原文姓名改成未经原文证实的汉字身份。literal_author_names逐项原样保留在translation中。
 各组editorial_constraints是与该组canonical来源绑定的核验事实。若指出原文自身有含义、符号或定义错误，text和translation仍忠实保留原句，同时在该组editing_notes中紧邻说明原文说法、规范关系和证据边界；不能只把提醒放在别处的公式卡。例如原文称后验分布为HMC势能时，应明确说明常规势能U=-log p(theta|D)+常数，若L为对数未归一化后验则U=-L+常数，而不静默改写原句或原式。
 中文translation须完整保留每一句的变量定义、因果关系、方法、条件、数值、单位、限定语和证据程度；不能用“本段介绍…”“定义参数A,T,b,Ea,R”等目录解说替代A、T、b、Ea、R各自的具体含义。物种浓度向量Y(t)与其时间导数（反应生成速率）必须按原文区分，不凭标题推断下段内容。输入给出translation_units时，逐项返回同顺序unit_id与完整translation，不合并、不遗漏；translation由全部单元译文顺次组成。标题按标题翻译，不能借相邻正文扩写。
+当前reading_groups.translation_units是唯一有效单元合同：一个单元可能包含多个句子，必须全部译在同一unit_id，不能按句号自行拆分、沿用旧稿单元编号或新增单元。旧稿只供内容比对；单元数量、ID和文本边界必须重新以本次输入为准。
 每组source_ids逐项照抄，组不能漏、合并或重复。editing_notes只记录具体校订或仍需核对的原文疑点，正文不混入编辑流程。""" + CLAIM_STRENGTH_RULES
 
 
@@ -173,13 +178,18 @@ def validate_polished_translation(item: dict, group: dict) -> None:
     if units:
         actual = item.get('translation_units')
         if not isinstance(actual,list) or any(not isinstance(unit,dict) for unit in actual) or [unit.get('unit_id') for unit in actual] != [unit['id'] for unit in units]:
-            raise PipelineError(f'{group["id"]} 的中文正文必须完整、按顺序覆盖每个translation_units单元，不能用摘要代替。')
+            expected_ids = [unit['id'] for unit in units]
+            actual_ids = [unit.get('unit_id') for unit in actual if isinstance(unit,dict)] if isinstance(actual,list) else []
+            raise PipelineError(f'{group["id"]} 的中文正文必须完整、按顺序覆盖每个translation_units单元，不能用摘要代替。expected={expected_ids}；actual={actual_ids}。逐项按本次输入的单元文本翻译，单元内多句须留在同一ID，不能沿用旧稿分句或新增ID。')
         if any(not isinstance(unit.get('translation'),str) or not unit['translation'].strip() for unit in actual):
             raise PipelineError(f'{group["id"]} 的中文正文译述单元为空。')
         item['translation'] = '\n\n'.join(unit['translation'].strip() for unit in actual)
     translation = item.get('translation')
     if not isinstance(translation,str) or not translation.strip():
         raise PipelineError(f'{group["id"]} 缺少完整中文translation。')
+    marker_pattern = r'⟦(?:inline formula|inline symbol:[^⟧]*)⟧'
+    if Counter(re.findall(marker_pattern,translation)) != Counter(re.findall(marker_pattern,group['text'])):
+        raise PipelineError(f'{group["id"]} 的中文正文须逐字保留未重建的inline公式/字形标记，不能将占位符改成猜测公式。')
     missing_names = [name for name in literal_author_names(group) if normalize_quote(name) not in normalize_quote(translation)]
     if missing_names:
         raise PipelineError(f'{group["id"]} 的作者Latin姓名须按原文保留，不能猜测汉字身份：{missing_names}。')
@@ -299,6 +309,19 @@ def polish_reading(source: dict, learning: dict, provider, run_dir: Path, progre
             if errors:
                 active_request['validation_errors'] = errors
                 active_request['invalid_reading'] = [item for item in (output or {}).get('clean_reading',[]) if isinstance(item,dict) and item.get('id') in {group['id'] for group in active_batch}]
+            expected_units = {group['id']:[unit['id'] for unit in polish_translation_units(group)] for group in active_batch}
+            for key in ('existing_reading','invalid_reading'):
+                if key not in active_request:
+                    continue
+                active_request[key] = copy.deepcopy(active_request[key])
+                for item in active_request[key]:
+                    old_units = item.get('translation_units')
+                    expected = expected_units.get(item.get('id'))
+                    if old_units is not None and expected is not None and (not isinstance(old_units,list) or any(not isinstance(unit,dict) for unit in old_units) or [unit.get('unit_id') for unit in old_units] != expected):
+                        # Keep the full draft text while removing obsolete unit
+                        # metadata which would compete with the current input.
+                        item.pop('translation_units',None)
+                        item.pop('translation_validation',None)
             response = None
             try:
                 response = provider.json(POLISH_SYSTEM, json.dumps(active_request, ensure_ascii=False))
@@ -437,6 +460,25 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
     combined = {key: [] for key in ('thematic_sections',) + keys}
     coverage = []
     source_map = {b['id']: b for b in source['blocks']}
+    def cache_context(value):
+        return {'source_sha256':value.get('sha256'), 'document_set_sha256':value.get('document_set_sha256'),
+                'source_evidence':[{'id':b['id'],'page':b['page'],'document':b.get('document','main'),'document_id':b.get('document_id','main'),'text':b['text'],'reading_role':b.get('reading_role')} for b in value['blocks']],
+                'verified_layout_observations':value.get('layout_observations',[]), 'editorial_review_context':value.get('editorial_review_context')}
+    context = cache_context(source)
+    resume = None
+    if (run_dir/'request.json').is_file():
+        resume_path = read_json(run_dir/'request.json').get('resume_from')
+        if resume_path:
+            candidate = Path(resume_path).expanduser().resolve()
+            if candidate != run_dir.resolve() and (candidate/'source.json').is_file() and cache_context(read_json(candidate/'source.json')) == context:
+                prior = {key:[] for key in ('thematic_sections',)+keys}
+                for chunk in sorted((candidate/'chunks').glob('chunk-*.json')):
+                    if re.fullmatch(r'chunk-\d{4}\.json',chunk.name):
+                        value = read_json(chunk)
+                        for key in prior: prior[key].extend(value.get(key,[]))
+                previous_entries = [{'input_id':f'{key}-{index+1}','section':key,'value':item} for key in prior for index,item in enumerate(prior[key])]
+                if previous_entries == entries:
+                    resume = candidate
     def item_ids(item):
         ids = list(item.get('source_ids', []))
         for paragraph in item.get('paragraphs', []):
@@ -447,6 +489,10 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
         progress(f'整理全篇主题与重复学习条目 {index}/{len(batches)}')
         schema = {key: [{'title':'具体主题', 'body':'保留全部独有科学条件的完整讲解', 'source_ids':['输入的全部相应canonical来源'], 'kind':'source|background|inference|uncertain'}] for key in keys[:4]}
         schema.update(thematic_sections=READING_SCHEMA['thematic_sections'], quiz=[{'question':'问题及完整条件','answer':'答案与推理','source_ids':['canonical来源'],'kind':'source|background|inference|uncertain'}], glossary=[{'term':'术语','english':'英文','definition':'定义及边界','source_ids':['canonical来源'],'kind':'source|background|inference|uncertain'}])
+        allowed_sections = [key for key in combined if any(entry['section']==key for entry in batch)]
+        empty_sections = [key for key in combined if key not in allowed_sections]
+        for key in empty_sections:
+            schema[key] = []
         input_ids = set().union(*(item_ids(entry['value']) for entry in batch))
         allowed_ids = set(source_map)
         schema['coverage'] = [{'input_id': '每个输入ID恰一次', 'action': 'retained|merged|excluded', 'reason': '具体说明合并或依原文纠正论断强度；排除仅限非科研元信息', 'citation_correction':{'original_source_ids':['纠错时完整原始引用；未纠错则省略此对象'],'corrected_source_ids':['有真实支撑的canonical来源'],'reason':'具体引用纠正原因','evidence':[{'block_id':'纠正后来源','page':'该来源页码','quote':'逐字原文证据'}]}}]
@@ -459,13 +505,27 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
         layout_observations = list(source.get('layout_observations', []))
         prompt = {'task': '将下列完整初稿条目按科学主题合并，保留全部独有条件和证据。主题正文使用paragraphs[{text,source_ids,kind}]，其他章节保持输入键结构，不将题目与其必要条件分离。',
                   'schema': schema, 'items': batch, 'source_evidence':source_evidence,
+                  'allowed_sections':allowed_sections, 'empty_sections':empty_sections,
+                  'section_contract':'只整理本批allowed_sections中的输入章节；empty_sections每一项必须返回[]。完整原文仅用于核对当前条目，不能据此新增本批没有输入的章节。',
                   'verified_layout_observations':layout_observations,
                   'editorial_review_context':source.get('editorial_review_context'),
                   'evidence_contract':'canonical-fulltext-v1; 原文全文用于核对，保留论断强度、模态、科学条件及原式疑点；不使用初稿替代证据'}
-        output = None
-        for attempt in range(1, 4):
+        input_hash = hashlib.sha256(json.dumps({'items':batch,'context':context},ensure_ascii=False,sort_keys=True).encode()).hexdigest()
+        output, resumed_from = None, None
+        if resume is not None:
+            cached = resume/'chunks'/f'consolidation-{index}.json'
+            if cached.is_file():
+                candidate = read_json(cached)
+                if candidate.get('_input_sha256') in {None,input_hash}:
+                    output, resumed_from = candidate, str(cached)
+                    progress(f'重新校验已有全篇整合 {index}/{len(batches)}')
+        for attempt in range(0 if resumed_from else 1, 4):
             try:
-                output = provider.json(CONSOLIDATE_SYSTEM, json.dumps(prompt, ensure_ascii=False))
+                if attempt:
+                    output = provider.json(CONSOLIDATE_SYSTEM, json.dumps(prompt, ensure_ascii=False))
+                extra_sections = [key for key in empty_sections if output.get(key)]
+                if extra_sections:
+                    raise PipelineError(f'全篇合并新增了没有本批输入的章节：{extra_sections}；这些章节须全部返回[]，仅整理{allowed_sections}，不可按完整原文自行新增章节。')
                 review = output.get('coverage')
                 expected = {entry['input_id'] for entry in batch}
                 if not isinstance(review, list) or len(review) != len(expected) or {item.get('input_id') for item in review if isinstance(item, dict)} != expected:
@@ -493,8 +553,6 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
                             kind = item.setdefault('kind', 'inference' if key=='transfer' else ('uncertain' if key=='critique' else 'source'))
                             if kind not in {'source','background','inference','uncertain'}:
                                 raise PipelineError(f'全篇合并{key}缺少有效来源性质kind。')
-                    if values and not any(entry['section']==key for entry in batch):
-                        raise PipelineError(f'全篇合并{key}新增了没有输入的章节内容。')
                 for row in review:
                     entry = input_map[row['input_id']]
                     covered = set().union(*(item_ids(item) for item in output[entry['section']]))
@@ -526,10 +584,10 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
             except PipelineCancelled:
                 raise
             except PipelineError as error:
-                write_json(run_dir/'chunks'/f'consolidation-{index}-invalid-{attempt}.json', {'response': output, 'error': str(error)})
+                write_json(run_dir/'chunks'/f'consolidation-{index}-invalid-{attempt}.json', {'response': output, 'error': str(error), 'input_sha256':input_hash,'resumed_from':resumed_from})
                 if attempt == 3: raise
                 prompt['validation_error'] = str(error)
-        write_json(run_dir/'chunks'/f'consolidation-{index}.json', output)
+        write_json(run_dir/'chunks'/f'consolidation-{index}.json', {**output,'_input_sha256':input_hash,'_resumed_from':resumed_from})
         for key in combined: combined[key].extend(output[key])
         coverage.extend(output['coverage'])
     for key, items in combined.items():

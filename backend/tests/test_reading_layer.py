@@ -356,6 +356,89 @@ class ReadingLayerTests(unittest.TestCase):
         self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['a'], ['b']])
         self.assertEqual(result['reading_fragments'][0]['source_ids'], ['eq'])
 
+    def test_inline_reaction_can_resume_on_the_same_line_then_wrap_an_acronym(self):
+        left = block('a', 'We consider the reversible reaction E þ S Ð', box=(40, 100, 210, 115))
+        left['lines'][0]['bbox'] = [180, 100, 210, 115]
+        original = source(left, block('rate', 'kr ES', box=(205, 100, 225, 118)),
+                          block('b', '. The results of', box=(230, 101, 290, 112)),
+                          block('c', 'CRNN with and without the constraint are compared.', box=(40, 125, 290, 155)))
+        result = apply_reading_layer(original)
+        self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['a', 'b', 'c']])
+        self.assertIn('⟦inline formula⟧. The results of CRNN', result['reading_main_blocks'][0]['text'])
+        self.assertEqual(result['reading_fragments'][0]['source_ids'], ['rate'])
+        self.assertEqual(result['reading_main_blocks'][0]['linked_layout_source_ids'], ['rate'])
+
+    def test_caption_inline_reaction_and_wrapped_panel_conditions_are_one_caption(self):
+        caption = block('a', 'Figure 7. Predictions with 4 standard deviations for reaction E þ S Ð',
+                        box=(40, 100, 560, 132), size=8)
+        caption['lines'][0]['bbox'] = [40, 124, 100, 132]
+        original = source(caption, block('rate', 'kf', box=(94, 119, 99, 126), size=5),
+                          block('b', 'kr ES. Dots indicate synthetic measurements with 5% Gaussian noise. Initial conditions are [6.46, 7.57, 0, 0]',
+                                box=(94, 124, 560, 139), size=8),
+                          block('c', '(a) and [1.78, 4.68, 0] (b).', box=(40, 139, 160, 147), size=8))
+        before = copy.deepcopy(original)
+        result = apply_reading_layer(original)
+        self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['a', 'b', 'c']])
+        group = result['reading_main_blocks'][0]
+        self.assertEqual(group['kind'], 'caption')
+        self.assertIn('[6.46, 7.57, 0, 0] (a) and [1.78, 4.68, 0] (b).', group['text'])
+        self.assertEqual(group['linked_layout_source_ids'], ['rate'])
+        self.assertEqual(result['reading_fragments'][0]['source_ids'], ['rate'])
+        self.assertTrue(all(b['reading_role'] == 'caption' for b in result['blocks'] if b['id'] in {'a', 'b', 'c'}))
+        self.assertEqual(result['raw_blocks'], before['raw_blocks'])
+        self.assertEqual([b['text'] for b in result['blocks']], [b['text'] for b in before['blocks']])
+        self.assertEqual(apply_reading_layer(copy.deepcopy(result)), result)
+
+    def test_caption_does_not_absorb_rotated_axes_or_a_different_font(self):
+        for metadata in ({'size': 10}, {'size': 8, 'source_role_hint': 'marginal'}):
+            with self.subTest(metadata=metadata):
+                caption = block('a', 'Figure 7. Predictions for the hypothetical reaction E þ S Ð',
+                                box=(40, 100, 560, 132), size=8)
+                caption['lines'][0]['bbox'] = [40, 124, 100, 132]
+                result = apply_reading_layer(source(caption, block('rate', 'kf', box=(94, 119, 99, 126), size=5),
+                                                    block('b', 'kr ES. Dots indicate synthetic measurements with Gaussian noise.',
+                                                          box=(94, 124, 560, 139), **metadata)))
+                self.assertEqual(result['reading_main_blocks'][0]['source_ids'], ['a'])
+                self.assertTrue(any(g['source_ids'] == ['b'] for g in result['reading_blocks']))
+
+    def test_inline_prose_on_same_baseline_does_not_cross_documents(self):
+        left = block('a', 'We consider a reaction E þ S Ð', box=(40, 100, 210, 115))
+        left['lines'][0]['bbox'] = [180, 100, 210, 115]
+        result = apply_reading_layer(source(left, block('rate', 'kr ES', box=(205, 100, 225, 118)),
+                                           block('b', '. The results follow.', box=(230, 101, 290, 112), document_id='supplement')))
+        self.assertEqual([g['source_ids'] for g in result['reading_main_blocks']], [['a'], ['b']])
+
+    def test_where_symbol_prefix_and_subscript_are_linked_without_guessing_greek_letters(self):
+        original = source(block('symbol', 'where ~yi\n', box=(320, 100, 355, 112)),
+                          block('a', 'j is the ith sample of parameters from the jth', box=(353, 103, 560, 114)),
+                          block('b', 'model. The prior has a Poisson distribution.', box=(320, 117, 560, 145)))
+        frozen = copy.deepcopy(original)
+        result = apply_reading_layer(original)
+        group = result['reading_main_blocks'][0]
+        self.assertEqual(group['source_ids'], ['a', 'b'])
+        self.assertTrue(group['text'].startswith('where ⟦inline symbol: ~yi j⟧ is the ith sample'))
+        self.assertNotIn('θ', group['text'])
+        self.assertEqual(group['linked_layout_source_ids'], ['symbol'])
+        self.assertEqual(result['reading_fragments'][0]['source_ids'], ['symbol'])
+        projection = group['inline_projections'][0]
+        raw_by_id = {b['id']: b['text'] for b in frozen['blocks']}
+        for literal in [projection['literal_prose_prefix']] + projection['literal_symbol_parts']:
+            self.assertEqual(raw_by_id[literal['source_id']][literal['raw_start']:literal['raw_end']], literal['text'])
+        self.assertEqual([b['text'] for b in result['blocks']], [b['text'] for b in frozen['blocks']])
+        self.assertEqual(result['raw_blocks'], frozen['raw_blocks'])
+        self.assertEqual(apply_reading_layer(copy.deepcopy(result)), result)
+
+    def test_where_prefix_requires_encoded_symbol_matching_baseline_and_document(self):
+        for text, box, document in [('where z', (320, 100, 355, 112), 'main'),
+                                    ('where ~yi', (320, 80, 355, 92), 'main'),
+                                    ('where ~yi', (320, 100, 355, 112), 'supplement')]:
+            with self.subTest(text=text, box=box, document=document):
+                result = apply_reading_layer(source(block('symbol', text, box=box, document_id=document),
+                                                    block('a', 'j is the ith sample from the model.', box=(353, 103, 560, 114))))
+                group = next(g for g in result['reading_main_blocks'] if g['id'] == 'a')
+                self.assertTrue(group['text'].startswith('j is'))
+                self.assertNotIn('inline_projections', group)
+
     def test_duplicate_source_ids_fail_instead_of_silently_aliasing(self):
         with self.assertRaises(ValueError): apply_reading_layer(source(block('same', 'First complete source paragraph.'), block('same', 'Second complete source paragraph.')))
 

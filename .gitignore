@@ -38,3 +38,9 @@ evidence/lattice-parity/raycast-initial-dev-build/
 evidence/lattice-parity/public-README.md
 evidence/lattice-parity/extensions-*.md
 evidence/lattice-parity/Package.before.swift
+# Local diagnostic harnesses and extracted material; concise delivery notes stay tracked.
+evidence/graphiti-real/
+evidence/independent-qa/
+evidence/quality-v2/reading-layer/
+evidence/lattice-parity/notes-intent-harness.swift
+evidence/lattice-parity/public-CHANGELOG.md
