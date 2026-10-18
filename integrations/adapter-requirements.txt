@@ -1,0 +1,5 @@
+# Graphiti imports httpx directly but its upstream metadata relies on OpenAI to
+# install it transitively. OpenAI 3 uses httpx2, so retain the explicit dependency.
+httpx>=0.28,<1
+# Local multilingual embeddings do not require a separate provider credential.
+fastembed>=0.7,<1

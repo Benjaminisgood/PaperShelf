@@ -10,3 +10,31 @@ dist/
 *.sqlite-shm
 evidence/*.log
 evidence/*.json
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+backend/build/
+.pytest_cache/
+evidence/learning-qa/
+evidence/real-learning/
+evidence/graphiti-real/d2cp05083h/
+evidence/graphiti-real/2002.09062/
+evidence/graphiti-real/*.json
+evidence/graphiti-real/*.log
+evidence/independent-qa/*-paragraphs.json
+.vscode/
+# Local reference papers and generated learning examples are not distribution assets.
+HTML/
+Examples/2002.09062.pdf
+Examples/d2cp05083h.pdf
+# Keep concise source-controlled QA notes, not machine-local output or reference-app dumps.
+evidence/**/*.log
+evidence/**/*.json
+evidence/**/*.png
+evidence/**/*.patch
+evidence/**/*.stderr
+evidence/lattice-parity/raycast-initial-dev-build/
+evidence/lattice-parity/public-README.md
+evidence/lattice-parity/extensions-*.md
+evidence/lattice-parity/Package.before.swift

@@ -1,0 +1,9 @@
+[submodule "integrations/Paper2Agent"]
+	path = integrations/Paper2Agent
+	url = https://github.com/jmiao24/Paper2Agent.git
+[submodule "integrations/markitdown"]
+	path = integrations/markitdown
+	url = https://github.com/microsoft/markitdown.git
+[submodule "integrations/graphiti"]
+	path = integrations/graphiti
+	url = https://github.com/getzep/graphiti.git

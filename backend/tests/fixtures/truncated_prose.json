@@ -1,0 +1,68 @@
+[
+  {
+    "block": {
+      "id": "p6-g226",
+      "page": 6,
+      "text": "In this section, we show that the B-CRNN can handle\ntemperature-dependent\nreaction\nsystems.\nThe\nreaction\nsystem38 produces biodiesel by transesterification of large,\nbranched triglyceride (TG) molecules into methyl ester mole-\ncules. The reactions of the system38 are described as\n",
+      "source_anchor": "In this section, we show that the B-CRNN can handle temperature-dependent reaction systems. The "
+    },
+    "truncated_paragraph": {
+      "source_id": "p6-g226",
+      "source_anchor": "In this section, we show that the B-CRNN can handle temperature-dependent reaction systems. The ",
+      "explanation": "在本节中，我们展示 B-CRNN 能够处理温度依赖的反应系统。该",
+      "translation_units": [],
+      "key_sentence": "In this section, we show that the B-CRNN can handle temperature-dependent reaction systems.",
+      "reasoning": "引入本节研究目标：验证模型对温度变化系统的适应性。"
+    }
+  },
+  {
+    "block": {
+      "id": "p6-g236",
+      "page": 6,
+      "text": "where DG, MG, and GL represent diglyceride, monoglyceride,\nand glycerol, respectively. To prepare the training dataset, 30\nexperiments were simulated with initial conditions randomly\nsampled between [0.2, 0.2, 0, 0, 0, 0] and [2.2, 2.2, 0, 0, 0, 0], and\nthe temperature was randomly drawn from [323, 343] K. In this\ncase, the reaction rates are represented by the Arrhenius law,\nwith the Arrhenius parameters ln A = [18.60,19.13,7.93] and\nEa = [14.54,14.42,6.47] kcal mol\u00031.\n",
+      "source_anchor": "where DG, MG, and GL represent diglyceride, monoglyceride, and glycerol, respectively. To prepar"
+    },
+    "truncated_paragraph": {
+      "source_id": "p6-g236",
+      "source_anchor": "where DG, MG, and GL represent diglyceride, monoglyceride, and glycerol, respectively. To prepar",
+      "explanation": "其中 DG、MG 和 GL 分别代表二甘油酯、单甘油酯和甘油。为了准备",
+      "translation_units": [],
+      "key_sentence": "where DG, MG, and GL represent diglyceride, monoglyceride, and glycerol, respectively.",
+      "reasoning": "定义物种符号。注意 source_anchor 截断了后续关于数据集准备的描述，但该段落的 explanation 需涵盖完整语义（见下文 methods/findings 引用）。此处仅翻译 anchor 对应文本。"
+    }
+  },
+  {
+    "block": {
+      "id": "p6-g237",
+      "page": 6,
+      "text": "First, we study the scenario where the information is com-\nplete, i.e., the concentration trajectories of all species are\nknown. The VI uncertainty quantification results under diﬀer-\nent measurement noise levels are shown in Fig. 5. Fig. 5(a)\ncontains the uncertainty intervals for the concentration trajec-\ntories of TG and DG with 1%, 5%, and 9% Gaussian noise. As\nthe noise level increases, the uncertainty intervals also increase,\n",
+      "source_anchor": "First, we study the scenario where the information is com- plete, i.e., the concentration trajec"
+    },
+    "truncated_paragraph": {
+      "source_id": "p6-g237",
+      "source_anchor": "First, we study the scenario where the information is com- plete, i.e., the concentration trajec",
+      "explanation": "首先，我们研究信息完-整的情况，即浓度轨-",
+      "translation_units": [],
+      "key_sentence": "",
+      "reasoning": "描述完整信息场景下的实验设置。由于 anchor 截断且包含连字符，译文保留原文结构特征。",
+      "rejected_key_sentence": "First, we study the scenario where the information is complete, i.e., the concentration trajectories of all species are known.",
+      "key_sentence_unavailable_reason": "摘句纠错后仍不匹配原文 anchor，已拒绝展示；完整来源与逐句译述保留。"
+    }
+  },
+  {
+    "block": {
+      "id": "p6-g238",
+      "page": 6,
+      "text": "Fig. 5\n(a) The uncertainty intervals for TG and DG under Gaussian noise level 1%, 5%, and 9% (from left to right) at the same initial conditions. Blue dots\nare noisy measurements. (b) The calculated distribution of the stoichiometric parameter of TG in eqn (17a) (W11 stands for the element in row 1 and\ncolumn 1 in W). Red dashed line indicates the true value. (c) The calculated distribution of the activation energy of eqn (17a). Red dashed line indicates the\ntrue value. The initial conditions for the shown case are [1.98, 1.93, 0, 0, 0, 0].\n",
+      "source_anchor": "Fig. 5 (a) The uncertainty intervals for TG and DG under Gaussian noise level 1%, 5%, and 9% (fr"
+    },
+    "truncated_paragraph": {
+      "source_id": "p6-g238",
+      "source_anchor": "Fig. 5 (a) The uncertainty intervals for TG and DG under Gaussian noise level 1%, 5%, and 9% (fr",
+      "explanation": "图5 (a) TG 和 DG 在高斯噪声水平 1%、5% 和 9%（从",
+      "translation_units": [],
+      "key_sentence": "",
+      "reasoning": "图注开头部分。"
+    }
+  }
+]

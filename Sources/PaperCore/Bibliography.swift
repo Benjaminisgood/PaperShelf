@@ -14,6 +14,16 @@ public enum BibliographyError: LocalizedError, Equatable {
     }
 }
 
+public struct BibTeXExportOptions: Equatable, Sendable {
+    /// BibTeX field names; nil includes every available field.
+    public var fields: Set<String>?
+    public var citationKeyTemplate: String
+    public var preserveCitationKeys: Bool
+    public init(fields: Set<String>? = nil, citationKeyTemplate: String = "{author}{year}{title}", preserveCitationKeys: Bool = true) {
+        self.fields = fields; self.citationKeyTemplate = citationKeyTemplate; self.preserveCitationKeys = preserveCitationKeys
+    }
+}
+
 public enum Bibliography {
     /// Imports common bibliographic fields. This is not a TeX renderer or a complete BibLaTeX implementation.
     public static func parse(_ text: String, format: String) throws -> [Reference] {
@@ -27,9 +37,10 @@ public enum Bibliography {
         }
     }
 
-    public static func exportBibTeX(_ references: [Reference]) -> String {
-        references.map { reference in
-            let key = "ref" + reference.id.uuidString.replacingOccurrences(of: "-", with: "")
+    public static func exportBibTeX(_ references: [Reference], options: BibTeXExportOptions = .init()) -> String {
+        let keyed = generateCitationKeys(references, template: options.citationKeyTemplate, preserveExisting: options.preserveCitationKeys)
+        return keyed.map { reference in
+            let key = reference.citationKey
             var fields: [(String, String)] = [("title", reference.title)]
             if !reference.authors.isEmpty {
                 fields.append(("author", reference.authors.map { author in
@@ -43,6 +54,8 @@ public enum Bibliography {
             for (name, value) in [("year", reference.year), ("journal", reference.journal),
                                   ("doi", reference.doi), ("url", reference.url),
                                   ("abstract", reference.abstract), ("note", reference.notes),
+                                  ("volume", reference.volume), ("number", reference.issue), ("pages", reference.pages),
+                                  ("publisher", reference.publisher), ("isbn", reference.isbn), ("issn", reference.issn),
                                   ("keywords", reference.tags.joined(separator: "; ")),
                                   ("papershelf_collection", reference.collection)] where !value.isEmpty {
                 fields.append((name, value))
@@ -52,10 +65,86 @@ public enum Bibliography {
                let json = String(data: data, encoding: .utf8) {
                 fields.append(("papershelf_tags", json))
             }
-            return "@article{\(key),\n" + fields.map { name, value in
+            let known = Set(fields.map(\.0))
+            for (name, value) in reference.extraFields.sorted(by: { $0.key < $1.key })
+                where !known.contains(name.lowercased()) && name.range(of: "^[a-zA-Z][a-zA-Z0-9_:-]*$", options: .regularExpression) != nil {
+                fields.append((name, value))
+            }
+            if let selected = options.fields { fields = fields.filter { selected.contains($0.0) } }
+            let kind = reference.entryType.range(of: "^[a-zA-Z][a-zA-Z0-9_-]*$", options: .regularExpression) != nil ? reference.entryType : "misc"
+            return "@\(kind){\(key),\n" + fields.map { name, value in
                 "  \(name) = {\(name == "author" ? value : escape(value))}"
             }.joined(separator: ",\n") + "\n}"
         }.joined(separator: "\n\n") + (references.isEmpty ? "" : "\n")
+    }
+
+    /// {author}/{Auth} preserve the first surname's case; {auth} lowercases it.
+    /// {shortyear} uses the final two digits of the year; {title} uses three words,
+    /// and {title-N} uses the first N words. Duplicate keys receive a, b, … suffixes.
+    public static func generateCitationKeys(_ references: [Reference], template: String = "{author}{year}{title}", preserveExisting: Bool = false, reservedKeys: Set<String> = []) -> [Reference] {
+        var used = Set(reservedKeys.map { $0.lowercased() })
+        return references.map { item in
+            var reference = item
+            let author = (item.authors.first ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let surname = author.isEmpty ? "Anon" : (author.contains(",")
+                ? String(author.split(separator: ",", omittingEmptySubsequences: false).first ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                : String(author.split(whereSeparator: { $0.isWhitespace }).last ?? Substring(author)))
+            let titleWords = item.title.split(whereSeparator: { $0.isWhitespace })
+            // Reference.year may also contain an ISO date imported from BibLaTeX.
+            let yearDigits = item.year.split(whereSeparator: { !$0.isNumber }).first.map(String.init) ?? ""
+            var generated = template
+                .replacingOccurrences(of: "{author}", with: surname)
+                .replacingOccurrences(of: "{auth}", with: surname.lowercased())
+                .replacingOccurrences(of: "{Auth}", with: surname)
+                .replacingOccurrences(of: "{year}", with: item.year)
+                .replacingOccurrences(of: "{shortyear}", with: String(yearDigits.suffix(2)))
+                .replacingOccurrences(of: "{title}", with: titleWords.prefix(3).joined())
+                .replacingOccurrences(of: "{id}", with: item.id.uuidString.replacingOccurrences(of: "-", with: ""))
+            let titlePattern = try! NSRegularExpression(pattern: #"\{title-([0-9]+)\}"#)
+            for match in titlePattern.matches(in: generated, range: NSRange(generated.startIndex..., in: generated)).reversed() {
+                guard let range = Range(match.range, in: generated), let numberRange = Range(match.range(at: 1), in: generated) else { continue }
+                // A count larger than Int.max still means all available words.
+                let count = Int(generated[numberRange]) ?? titleWords.count
+                generated.replaceSubrange(range, with: titleWords.prefix(count).joined())
+            }
+            var base = preserveExisting && !item.citationKey.isEmpty ? item.citationKey : generated
+            base = base.folding(options: [.diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+                .filter { $0.isLetter || $0.isNumber || "_:-.+/".contains($0) }
+            if base.isEmpty { base = "ref" + item.id.uuidString.replacingOccurrences(of: "-", with: "") }
+            var key = base; var suffix = 0
+            while used.contains(key.lowercased()) {
+                var number = suffix; var letters = ""
+                repeat { letters = String(UnicodeScalar(97 + number % 26)!) + letters; number = number / 26 - 1 } while number >= 0
+                key = base + letters; suffix += 1
+            }
+            used.insert(key.lowercased()); reference.citationKey = key
+            return reference
+        }
+    }
+
+    public static func exportRIS(_ references: [Reference]) -> String {
+        references.map { reference in
+            let types = ["article": "JOUR", "book": "BOOK", "inbook": "CHAP", "incollection": "CHAP", "inproceedings": "CPAPER", "proceedings": "CONF", "phdthesis": "THES", "mastersthesis": "THES", "techreport": "RPRT", "misc": "GEN"]
+            var fields: [(String, String)] = [("TY", types[reference.entryType.lowercased()] ?? "GEN"), ("TI", reference.title)]
+            fields += reference.authors.map { ("AU", $0) }
+            fields += [("PY", reference.year), ("JO", reference.journal), ("DO", reference.doi), ("UR", reference.url),
+                       ("AB", reference.abstract), ("N1", reference.notes), ("VL", reference.volume), ("IS", reference.issue),
+                       ("SP", reference.pages), ("PB", reference.publisher), ("SN", reference.isbn.isEmpty ? reference.issn : reference.isbn), ("ID", reference.citationKey)]
+            fields += reference.tags.map { ("KW", $0) }
+            // Standard RIS has no arbitrary-field namespace. A custom tag preserves exact extended metadata.
+            let supplemental = ["entryType": reference.entryType, "isbn": reference.isbn, "issn": reference.issn,
+                                "collection": reference.collection, "extraFields": jsonString(reference.extraFields)]
+            fields.append(("C1", "PaperShelf:" + jsonString(supplemental)))
+            let lines = fields.filter { !$0.1.isEmpty }.map { tag, value in
+                tag + "  - " + value.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n").replacingOccurrences(of: "\n", with: "\n      ")
+            }
+            return (lines + ["ER  -"]).joined(separator: "\n")
+        }.joined(separator: "\n\n") + (references.isEmpty ? "" : "\n")
+    }
+
+    private static func jsonString<T: Encodable>(_ value: T) -> String {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        return (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
     }
 
     public static func exportMarkdown(_ references: [Reference]) -> String {
@@ -109,7 +198,7 @@ public enum Bibliography {
         return result
     }
 
-    fileprivate static func reference(_ fields: [String: String]) -> Reference {
+    fileprivate static func reference(_ fields: [String: String], key: String, kind: String) -> Reference {
         func value(_ names: String...) -> String {
             for name in names { if let raw = fields[name], !raw.isEmpty { return decode(raw) } }
             return ""
@@ -119,10 +208,14 @@ public enum Bibliography {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         if let data = value("papershelf_tags").data(using: .utf8),
            let savedTags = try? JSONDecoder().decode([String].self, from: data) { tags = savedTags }
+        let known: Set<String> = ["title", "author", "year", "journal", "doi", "url", "abstract", "note", "keywords", "papershelf_tags", "papershelf_collection", "volume", "number", "pages", "publisher", "isbn", "issn"]
         return Reference(title: value("title"), authors: splitAuthors(rawAuthors), year: value("year", "date"),
                          journal: value("journal", "journaltitle", "booktitle"), doi: value("doi"), url: value("url"),
                          abstract: value("abstract"), notes: value("note", "annote"), tags: tags,
-                         collection: value("papershelf_collection"))
+                         collection: value("papershelf_collection"), citationKey: key, entryType: kind,
+                         volume: value("volume"), issue: value("number", "issue"), pages: value("pages"),
+                         publisher: value("publisher"), isbn: value("isbn"), issn: value("issn"),
+                         extraFields: fields.filter { !known.contains($0.key) }.mapValues(decode))
     }
 
     private static func splitAuthors(_ value: String) -> [String] {
@@ -201,10 +294,23 @@ public enum Bibliography {
                     return ""
                 }
                 let date = first("PY", "Y1", "DA")
+                let typeMap = ["JOUR": "article", "BOOK": "book", "CHAP": "incollection", "CPAPER": "inproceedings", "CONF": "proceedings", "THES": "phdthesis", "RPRT": "techreport"]
+                var extra: [String: String] = [:]
+                var supplemental: [String: String] = [:]
+                if let data = record["C1"]?.first(where: { $0.hasPrefix("PaperShelf:") })?.dropFirst("PaperShelf:".count).data(using: .utf8) {
+                    supplemental = (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
+                    if let data = supplemental["extraFields"]?.data(using: .utf8) { extra = (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:] }
+                }
+                let page = first("SP") + (first("EP").isEmpty ? "" : "--" + first("EP"))
                 records.append(Reference(title: first("TI", "T1", "CT"), authors: record["AU"] ?? record["A1"] ?? [],
                                          year: String(date.prefix(4)), journal: first("JO", "JF", "JA", "T2"),
                                          doi: first("DO"), url: first("UR"), abstract: (record["AB"] ?? []).joined(separator: "\n"),
-                                         notes: (record["N1"] ?? []).joined(separator: "\n"), tags: record["KW"] ?? []))
+                                         notes: (record["N1"] ?? []).joined(separator: "\n"), tags: record["KW"] ?? [],
+                                         collection: supplemental["collection"] ?? "", citationKey: first("ID"),
+                                         entryType: supplemental["entryType"] ?? typeMap[first("TY")] ?? "misc",
+                                         volume: first("VL"), issue: first("IS"), pages: page, publisher: first("PB"),
+                                         isbn: supplemental["isbn"] ?? (first("TY") == "BOOK" ? first("SN") : ""),
+                                         issn: supplemental["issn"] ?? (first("TY") == "BOOK" ? "" : first("SN")), extraFields: extra))
                 fields = nil; previousTag = nil
             } else {
                 guard fields != nil else { throw BibliographyError.malformed("RIS 第 \(offset + 1) 行在 TY 之前。") }
@@ -267,10 +373,7 @@ private struct BibParser {
                     else if current != close { throw failure("字段之间缺少逗号。") }
                 }
                 try expect(close)
-                guard fields["title"] != nil || fields["author"] != nil || fields["doi"] != nil else {
-                    throw failure("条目 \(key) 没有标题、作者或 DOI。")
-                }
-                references.append(Bibliography.reference(fields))
+                references.append(Bibliography.reference(fields, key: key, kind: kind))
             }
             skipSpace()
         }

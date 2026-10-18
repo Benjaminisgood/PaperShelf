@@ -1,0 +1,23 @@
+{
+  "Paper2Agent": {
+    "url": "https://github.com/jmiao24/Paper2Agent.git",
+    "path": "integrations/Paper2Agent",
+    "branch": "main",
+    "commit": "8c2d059165ef8cdcb70dbea76655b9c2b55b38e6",
+    "license": "MIT"
+  },
+  "markitdown": {
+    "url": "https://github.com/microsoft/markitdown.git",
+    "path": "integrations/markitdown",
+    "branch": "main",
+    "commit": "4cc9fa17653d695d64fb9eee5b33d4de55ff84e8",
+    "license": "MIT"
+  },
+  "graphiti": {
+    "url": "https://github.com/getzep/graphiti.git",
+    "path": "integrations/graphiti",
+    "branch": "main",
+    "commit": "a107b622205733c0a53617ce0cd79fe4461cdb35",
+    "license": "Apache-2.0"
+  }
+}

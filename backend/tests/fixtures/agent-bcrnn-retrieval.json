@@ -1,0 +1,70 @@
+{
+  "source_sha256": "15843fdb1d6f08969e51fb215f5e420c46212b95e9a61a15a4d0bb0a23f73bf0",
+  "blocks": [
+    {
+      "id": "p2-g11",
+      "page": 2,
+      "text": "PAPER\n"
+    },
+    {
+      "id": "p3-g36",
+      "page": 3,
+      "text": "Paper\n"
+    },
+    {
+      "id": "p4-g105",
+      "page": 4,
+      "text": "Carlo (HMC) method, as a specific variant of Markov chain\nMonte Carlo (MCMC) algorithms, tries to approximate the\nposterior distribution of h by constructing a Markov chain.\nThe samples from the Markov chain are used to perform\nstatistical analysis of the supposedly matched probabilistic\ndistribution. The HMC method is proposed to suppress ran-\ndom walking behaviors seen in the earlier variants of MCMC30\nand thus sample more eﬃciently in a high-dimensional space.\nIn the HMC method, the sampling of unknown variables is\n"
+    },
+    {
+      "id": "p4-g109",
+      "page": 4,
+      "text": "equivalent to calculating the position of a particle, with the\nposterior distribution of the unknown variable as the potential\nenergy of the particle. The state of a particle is sampled\naccording to\n"
+    },
+    {
+      "id": "p4-g149",
+      "page": 4,
+      "text": "By repeating the above process, we can generate a sequence of\nsamples for h for later statistical analysis. L and e are two\nadjustable parameters for HMC. They are usually automatically\ntuned in open source packages,31,32 such as TyXe32 used in\nthis paper.\n"
+    },
+    {
+      "id": "p5-g202",
+      "page": 5,
+      "text": "Fig. 3\nThe (a) VI and (b) HMC results for the five species in the elementary reaction system. Blue dots are the synthetic measurements with 5% of\nGaussian noise. The shaded regions indicate 4 standard deviation intervals. Red lines are the mean values of the generated trajectories.\n"
+    },
+    {
+      "id": "p7-g246",
+      "page": 7,
+      "text": "Fig. 6\nInfluence of missing species profiles of DG on the predictions and uncertainties. Blue dots are the synthetic measurements with 5% of Gaussian\nnoise. Red and green curves are predictions by the B-CRNN model trained with all species profiles and with all species but missing DG profiles,\nrespectively. The two solid lines with the same color indicate the uncertainty intervals of 4 standard deviations, while the dashed lines are the\ncorresponding mean predictions. When the information on DG is missing for the training, the B-CRNN can still infer the chemical model but with an\nincreased level of uncertainty, especially for TG and DG. The initial conditions for the shown case are [1.98, 1.93, 0, 0, 0, 0].\n"
+    },
+    {
+      "id": "p7-g272",
+      "page": 7,
+      "text": "which is mathematically equivalent to the ground truth reac-\ntion mechanism. We further demonstrate the necessity of\nembedding the physical constraint with the technique shown\nin eqn (19) with a hypothetical reversible reaction only con-\n"
+    },
+    {
+      "id": "p8-g309",
+      "page": 8,
+      "text": "Fig. 8\nSelected species profiles for the catalyst reaction case. The shaded\nregions indicate 4 standard deviations.\n"
+    },
+    {
+      "id": "p9-g347",
+      "page": 9,
+      "text": "In practice, we calculate the mean trajectory prediction and\nstandard deviations as the weighted sum of the corresponding\nvalues from all viable models, with the weights from eqn (24).\nFor the biodiesel case in Section 3.2, the parameters are set as\nNj = 3, k1, k2, k3 = 3, 4, 5, respectively, and l = 3. The minimum\nvalue of k is set as 3 because with k = 2 the CRNN is unable to fit\nthe data accurately enough.20 The value for l is set so that the\nmode of the prior distribution is the same as the minimum k.\nThe predictive posterior distribution is illustrated in Fig. 11.\nThe training dataset contains 5 experiments with 5% Gaussian\nnoise and 1 s measurement time interval. Only the measure-\nments within [0, 50] s are used for training. Those within\n[50, 200] s were not used in training and only displayed here\nfor evaluation of the long-term uncertainty prediction of the B-\nCRNN. With diﬀerent numbers of reactions assumed, the\nuncertainty regions can be significantly diﬀerent. The model\nmixing, by considering diﬀerent types of variations from dif-\nferent assumptions on the number of reactions, provides a\nmore reasonable uncertainty interval estimation especially in\nthe long-term prediction, as shown in the last subfigure.\n"
+    },
+    {
+      "id": "p9-g350",
+      "page": 9,
+      "text": "Fig. 10\nThe B-CRNN results on the same case as shown in Fig. 3, but with missing measurements in the [2, 28] s time span. The shaded regions indicate\n4 standard deviations.\n"
+    },
+    {
+      "id": "p10-g365",
+      "page": 10,
+      "text": "Qiaofeng Li: Methodology, investigation, writing – original\ndraft. Huaibo Chen: investigation, writing – original draft.\nBenjamin C. Koenig: methodology, writing – review and\n"
+    },
+    {
+      "id": "p10-g366",
+      "page": 10,
+      "text": "Fig. 12\nComparison between UQ on all parameters and UQ on kinetic parameters only for the biodiesel system. The initial conditions are the same as\nFig. 6. Blue dots are the synthetic measurements with 5% of Gaussian noise. Red and green curves mark the uncertain intervals (4 standard deviations) by\nthe B-CRNN model performing UQ on all parameters and kinetic parameters, respectively. The dashed lines are the corresponding mean predictions.\nWhen performing UQ on kinetic parameters only, since the number of uncertain variables decreases significantly (from 24 to 6 in this case), the\nuncertainty intervals become tighter.\n"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="TaskPaneApp">
+  <Id>b5d30cef-5689-4f6f-a5bb-dad5bfe2dbea</Id><Version>1.0.0.0</Version><ProviderName>PaperShelf</ProviderName><DefaultLocale>zh-CN</DefaultLocale>
+  <DisplayName DefaultValue="PaperShelf Citations"/><Description DefaultValue="Search your local PaperShelf library and insert CSL citations and bibliographies."/>
+  <IconUrl DefaultValue="https://localhost:29469/icon.png"/><SupportUrl DefaultValue="https://localhost:29469/"/>
+  <AppDomains><AppDomain>https://localhost:29469</AppDomain></AppDomains><Hosts><Host Name="Document"/></Hosts>
+  <Requirements><Sets DefaultMinVersion="1.3"><Set Name="WordApi"/></Sets></Requirements>
+  <DefaultSettings><SourceLocation DefaultValue="https://localhost:29469/"/></DefaultSettings><Permissions>ReadWriteDocument</Permissions>
+</OfficeApp>

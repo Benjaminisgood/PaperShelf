@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { mkdtemp, writeFile, chmod, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { createHandler } from '../src/server.mjs';
+import { loadStyles } from '../src/formatter.mjs';
+import { apiGet, readConnection } from '../src/local-api.mjs';
+const resources = await loadStyles();
+test('real loopback HTTP transport protects the read proxy with exact Host, Origin and a session nonce', async t => {
+  const calls = []; const server = http.createServer();
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  server.on('request', createHandler({ origin, resources, nonce: 'test-session', get: async route => { calls.push(route); return { ok: true }; } }));
+  assert.equal((await fetch(origin + '/api/status')).status, 401);
+  assert.equal((await fetch(origin + '/session', { headers: { Origin: 'https://evil.example' } })).status, 403);
+  assert.equal(await new Promise(resolve => { http.get(origin + '/session', { headers: { Host: 'evil.example' } }, response => { response.resume(); resolve(response.statusCode); }); }), 403);
+  assert.equal((await fetch(origin + '/session', { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
+  const session = await (await fetch(origin + '/session')).json(); assert.equal(session.nonce, 'test-session');
+  const headers = { 'X-PaperShelf-Session': session.nonce, Origin: origin };
+  assert.deepEqual(await (await fetch(origin + '/api/status', { headers })).json(), { ok: true });
+  assert.equal((await fetch(origin + '/api/search?q=hello+world%26limit%3D500&offset=20', { headers })).status, 200);
+  assert.equal(calls[1], '/search?q=hello%20world%26limit%3D500&offset=20&limit=20');
+  assert.equal((await fetch(origin + '/api/search?offset=-1', { headers })).status, 422);
+  assert.equal((await fetch(origin + '/api/papers', { method: 'POST', headers })).status, 404);
+  assert.equal((await fetch(origin + '/format', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, style: 'numeric', items: {}, citations: [] }) })).status, 200);
+  assert.equal((await fetch(origin + '/format', { method: 'POST', headers, body: '{}' })).status, 415);
+  assert.equal(calls.length, 2);
+});
+test('connection credentials remain in authenticated server-to-server requests; redirects and external hosts rejected', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'papershelf-word-')); t.after(() => rm(directory, { recursive: true, force: true }));
+  const filename = path.join(directory, 'connection.json');
+  const connection = { version: 1, baseURL: 'http://127.0.0.1:29468/api/v1', token: 'secret-fixture-token' };
+  await writeFile(filename, JSON.stringify(connection), { mode: 0o600 });
+  const result = await apiGet('/search?q=test', { filename, fetchImpl: async (url, options) => {
+    assert.equal(url, connection.baseURL + '/search?q=test'); assert.equal(options.headers.Authorization, 'Bearer secret-fixture-token'); assert.equal(options.redirect, 'error'); return { ok: true, json: async () => ({ items: [] }) };
+  } }); assert.deepEqual(result, { items: [] });
+  await chmod(filename, 0o644); await assert.rejects(() => readConnection(filename), /0600/); await chmod(filename, 0o600);
+  await writeFile(filename, JSON.stringify({ ...connection, baseURL: 'https://remote.example/api/v1' })); await assert.rejects(() => readConnection(filename), /Invalid/);
+  await assert.rejects(() => apiGet('/papers/../../secret', { filename }), /Unsupported/);
+});

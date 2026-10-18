@@ -1,0 +1,38 @@
+{
+  "graphiti": {
+    "enabled": true,
+    "backend": "neo4j",
+    "uri": "bolt://127.0.0.1:17687",
+    "user": "neo4j",
+    "password_environment": "NEO4J_PASSWORD",
+    "group_id": "papershelf",
+    "provider": "openai-compatible",
+    "endpoint": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    "model": "qwen3.7-plus",
+    "small_model": "qwen3.7-plus",
+    "extra_body": {"enable_thinking": false},
+    "timeout_seconds": 240,
+    "api_key_environment": "PAPERSHELF_API_KEY",
+    "omit_temperature": true,
+    "embedding_backend": "fastembed",
+    "local_embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "embedding_dimensions": 384,
+    "structured_output_mode": "json_object",
+    "episode_characters": 12000,
+    "entity_types": {
+      "Catalyst": {
+        "description": "A catalyst actually reported in the source literature",
+        "fields": [
+          {"name": "composition", "type": "text", "description": "Reported chemical composition; null if absent"},
+          {"name": "support", "type": "text", "description": "Reported support; null if absent"}
+        ]
+      }
+    }
+  },
+  "paper2agent": {
+    "enabled": true,
+    "host": "codex",
+    "repository": null,
+    "focus": "Keep source provenance and distinguish reported results from inference."
+  }
+}

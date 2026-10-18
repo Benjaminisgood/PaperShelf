@@ -8,8 +8,8 @@ struct DOIImportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Label("通过 DOI 导入", systemImage: "link.badge.plus").font(.title2.bold())
-            Text("输入 DOI 或 doi.org 链接。此操作会将该 DOI 发送给 Crossref 查询元数据。").font(.callout).foregroundStyle(.secondary)
+            Label("通过标识符导入", systemImage: "link.badge.plus").font(.title2.bold())
+            Text("输入 DOI、ISBN 或 arXiv。仅将标识符发送至 Crossref / DataCite、Open Library 或 arXiv 查询元数据。").font(.callout).foregroundStyle(.secondary)
             TextField("10.1038/nphys1170", text: $doi).textFieldStyle(.roundedBorder)
             if let importError { Text(importError).font(.caption).foregroundStyle(.red) }
             HStack {

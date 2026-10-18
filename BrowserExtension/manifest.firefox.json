@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "PaperShelf Capture",
+  "version": "0.1.0",
+  "description": "Capture the current public article's metadata and PDF link into the local PaperShelf app, with explicit confirmation.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {"default_title": "采集到 PaperShelf", "default_popup": "popup.html", "default_icon": {"16": "icons/icon-16.png", "32": "icons/icon-32.png"}},
+  "icons": {"16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png"},
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'"},
+  "browser_specific_settings": {"gecko": {"id": "capture@papershelf.local", "strict_min_version": "128.0", "data_collection_permissions": {"required": ["none"]}}}
+}

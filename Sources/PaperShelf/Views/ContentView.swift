@@ -1,120 +1,119 @@
 import SwiftUI
+import QuickLook
 import PaperCore
 
 struct ContentView: View {
     @ObservedObject var store: LibraryStore
-    @State private var showingDOI = false
-    @State private var confirmingDelete = false
-
+    @Environment(\.undoManager) private var undoManager
+    @SceneStorage("library.inspector") private var showingInspector = true
+    @AppStorage("library.showStatusBar") private var showStatusBar = true
+    @FocusState private var searchFocused: Bool
+    @State private var confirmingPurge = false
     var body: some View {
-        NavigationSplitView {
-            SidebarView(store: store)
-                .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 250)
-        } content: {
-            VStack(spacing: 0) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(store.heading).font(.title2.bold())
-                        Text("\(store.filtered.count) 篇文献").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Menu {
-                        Button("最近导入") { store.sortNewest = true }
-                        Button("标题 A–Z") { store.sortNewest = false }
-                    } label: { Image(systemName: "arrow.up.arrow.down") }
-                    .menuStyle(.borderlessButton).frame(width: 25).help("排序")
-                }.padding(18)
-                Divider()
-                if store.filtered.isEmpty {
-                    ContentUnavailableView {
-                        Label(store.references.isEmpty ? "建立你的文献书架" : "没有匹配的文献", systemImage: "books.vertical")
-                    } description: {
-                        Text(store.references.isEmpty ? "导入 PDF、BibTeX 或 RIS，或通过 DOI 获取元数据。PDF 始终保留在原位置。" : "试试其他关键词，或切换左侧分类。")
-                    } actions: {
-                        Button("导入文献…") { store.importFiles() }.buttonStyle(.borderedProminent)
-                    }
-                    .frame(maxHeight: .infinity)
-                } else {
-                    Table(store.filtered, selection: $store.selectedID) {
-                        TableColumn("文献") { reference in
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack(spacing: 5) {
-                                    if reference.isFavorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.orange) }
-                                    Text(reference.title).fontWeight(reference.isRead ? .regular : .semibold).lineLimit(2)
-                                }
-                                Text(reference.authors.isEmpty ? "作者待补充" : reference.authors.joined(separator: ", "))
-                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                            }.padding(.vertical, 6)
-                        }.width(min: 210, ideal: 330)
-                        TableColumn("年份", value: \.year).width(50)
-                        TableColumn("期刊", value: \.journal).width(min: 70, ideal: 110)
-                        TableColumn("PDF") { item in
-                            Image(systemName: item.pdfPath == nil ? "minus" : "doc.text")
-                                .foregroundStyle(.secondary)
-                        }.width(30)
-                    }
-                    .contextMenu(forSelectionType: UUID.self) { ids in
-                        if let id = ids.first, let item = store.references.first(where: { $0.id == id }) {
-                            Button("打开 PDF") { store.openPDF(item) }.disabled(item.pdfPath == nil)
-                            Button("复制 BibTeX") { store.copyCitation(item) }
-                            Button(item.isRead ? "标记为待读" : "标记为已读") {
-                                var changed = item; changed.isRead.toggle(); _ = store.save(changed)
-                            }
-                            Divider()
-                            Button("移除记录…", role: .destructive) { store.selectedID = id; confirmingDelete = true }
-                        }
-                    } primaryAction: { ids in
-                        if let id = ids.first, let item = store.references.first(where: { $0.id == id }) { store.openPDF(item) }
+        VStack(spacing: 0) {
+            NavigationSplitView {
+                SidebarView(store: store).navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 320)
+            } detail: {
+                Group {
+                    if store.filtered.isEmpty {
+                        ContentUnavailableView {
+                            Label(store.search.isEmpty ? "还没有文献" : "没有匹配的文献", systemImage: "books.vertical")
+                        } description: { Text("拖入 PDF、BibTeX 或 RIS，也可以通过标识符或浏览器采集。") }
+                        actions: { Button("导入文献…") { store.importFiles() } }
+                    } else { LibraryTable(store: store) }
+                }
+                .navigationTitle(Text(LocalizedStringKey(store.heading)))
+                .navigationSubtitle(Bundle.main.bundleIdentifier == "local.papershelf.qa" ? "测试文库" : "")
+                .inspector(isPresented: $showingInspector) {
+                    if let item = store.selected {
+                        ReferenceDetail(store: store, reference: item).id(item.id)
+                            .inspectorColumnWidth(min: 330, ideal: 390, max: 620)
+                    } else {
+                        ContentUnavailableView("选择文献", systemImage: "doc.text.magnifyingglass", description: Text("元数据、标注与研读资料将在这里显示。"))
+                            .inspectorColumnWidth(min: 330, ideal: 390, max: 620)
                     }
                 }
+                .dropDestination(for: URL.self) { urls, _ in
+                    let files = urls.filter(\.isFileURL); guard !files.isEmpty else { return false }
+                    store.importURLs(files); return true
+                }
             }
-            .navigationSplitViewColumnWidth(min: 420, ideal: 600)
-        } detail: {
-            if let item = store.selected {
-                ReferenceDetail(store: store, reference: item).id(item.id)
-            } else {
-                ContentUnavailableView("选择一篇文献", systemImage: "doc.text.magnifyingglass", description: Text("查看元数据、阅读笔记与 PDF 批注。"))
-            }
-        }
-        .searchable(text: $store.search, prompt: "搜索标题、作者、DOI、标签")
-        .onChange(of: store.filter) { _, _ in clearHiddenSelection() }
-        .onChange(of: store.search) { _, _ in clearHiddenSelection() }
-        .toolbar {
-            ToolbarItemGroup {
-                Button { store.importFiles() } label: { Label("导入", systemImage: "square.and.arrow.down") }.help("导入 PDF / BibTeX / RIS")
-                Button { showingDOI = true } label: { Label("DOI", systemImage: "link.badge.plus") }.help("通过 DOI 导入")
-                Button { store.addManual() } label: { Label("添加", systemImage: "plus") }.help("手动添加文献")
-                Menu {
-                    Button("当前列表 → BibTeX…") { store.export(.bibtex) }
-                    Button("当前列表 → Markdown…") { store.export(.markdown) }
-                    Divider()
-                    Button("选中文献 → BibTeX…") { store.export(.bibtex, selectedOnly: true) }.disabled(store.selected == nil)
-                } label: { Label("导出", systemImage: "square.and.arrow.up") }
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
+            .searchable(text: $store.search, placement: .sidebar, prompt: "搜索全部文献")
+            .searchFocused($searchFocused)
+            .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfFocusSearch"))) { _ in searchFocused = true }
+            if showStatusBar {
                 Divider()
-                HStack(spacing: 8) {
-                    Image(systemName: "internaldrive").foregroundStyle(.secondary)
-                    Text(store.status).lineLimit(1).font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    if let progress = store.fileProgress {
+                        ProgressView(value: Double(progress.completed), total: Double(max(1, progress.total))).frame(width: 90)
+                        Text("\(progress.completed) / \(progress.total)")
+                        Button(progress.isCancelling ? "取消中…" : "取消") { store.cancelFileOperation() }.buttonStyle(.borderless).disabled(progress.isCancelling)
+                    } else if store.isBusy { ProgressView().controlSize(.mini) }
+                    Text(store.status).lineLimit(1)
+                    if store.importTask != nil && store.fileProgress == nil { Button("取消导入") { store.importTask?.cancel() }.buttonStyle(.borderless) }
                     Spacer()
-                    Text("本地书库").font(.caption2).foregroundStyle(.secondary)
-                }.padding(.horizontal, 16).padding(.vertical, 8)
-            }.background(.bar)
+                    Text(store.selectedIDs.isEmpty ? "\(store.filtered.count) 篇文献" : "已选择 \(store.selectedIDs.count) / \(store.filtered.count) 篇")
+                }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 14).padding(.vertical, 6)
+            }
         }
-        .sheet(isPresented: $showingDOI) { DOIImportView(store: store) }
-        .alert("操作未完成", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
-            Button("好") { store.error = nil }
-        } message: { Text(store.error ?? "") }
-        .confirmationDialog("移除此书库记录？原始 PDF 不会删除。", isPresented: $confirmingDelete, titleVisibility: .visible) {
-            Button("移除记录", role: .destructive) { store.removeSelected() }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    Button("导入文件…", systemImage: "square.and.arrow.down") { store.importFiles() }
+                    Button("通过 DOI / ISBN / arXiv 添加…", systemImage: "link.badge.plus") { store.showingIdentifier = true }
+                    Button("手动添加…", systemImage: "doc.badge.plus") { store.addManual() }
+                    Divider()
+                    Button("新建文集…", systemImage: "folder.badge.plus") { store.editCollection() }
+                    Button("从 Zotero 迁移…") { store.importZotero() }
+                } label: { Label("添加", systemImage: "plus") }.help("导入或添加文献")
+                Menu {
+                    ForEach(LibraryExportScope.allCases, id: \.self) { scope in
+                        Menu(LocalizedStringKey(scope.rawValue)) {
+                            ForEach(ExportFormat.allCases, id: \.self) { format in
+                                Button("\(format.rawValue)…") { store.export(format, scope: scope) }
+                            }
+                        }.disabled(scope == .selected && store.selectedIDs.isEmpty)
+                    }
+                    Divider()
+                    Button("备份书库…") { store.backupLibrary() }
+                    Button("恢复书库…") { store.restoreLibrary() }
+                } label: { Label("导出", systemImage: "square.and.arrow.up") }.help("导出与备份")
+            }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+            ToolbarItem(placement: .primaryAction) {
+                Button { showingInspector.toggle() } label: { Label("检查器", systemImage: "sidebar.right") }.help(showingInspector ? "隐藏检查器" : "显示检查器")
+            }
+            if store.selectedIDs.count > 1 {
+                ToolbarItem(placement: .secondaryAction) { Button("批量编辑", systemImage: "square.and.pencil") { store.showingBatchEditor = true } }
+            }
+            if store.filter == "trash" && !store.selectedIDs.isEmpty {
+                ToolbarItemGroup(placement: .secondaryAction) {
+                    Button("恢复") { store.restoreSelected() }
+                    Button("永久删除…", role: .destructive) { confirmingPurge = true }
+                }
+            }
         }
+        .quickLookPreview($store.previewURL)
+        .sheet(isPresented: $store.showingIdentifier) { DOIImportView(store: store) }
+        .sheet(isPresented: $store.showingBatchEditor) { BatchEditView(store: store) }
+        .sheet(item: $store.editingReference) { item in
+            MetadataEditor(reference: item, collections: store.collectionRecords) { updated in
+                guard let current = store.references.first(where: { $0.id == item.id }), current.deletedAt == item.deletedAt else { return "文献在编辑期间已被移除或恢复，请重新打开编辑器。" }
+                do {
+                    let merged = try ReferenceEdits.merge(base: item, edited: updated, current: current)
+                    if store.save(merged) { return nil }
+                    let message = store.error ?? "保存失败"; store.error = nil; return message
+                } catch { return error.localizedDescription }
+            }
+        }
+        .alert("操作未完成", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) { Button("好") { store.error = nil } } message: { Text(store.error ?? "") }
+        .confirmationDialog("永久删除选中记录？原始文件不会删除，此操作不能撤销。", isPresented: $confirmingPurge, titleVisibility: .visible) {
+            Button("永久删除记录", role: .destructive) { store.permanentlyDeleteSelected() }
+        }
+        .onAppear { store.undoManager = undoManager }
+        .onChange(of: store.filter) { _, _ in clearHiddenSelection() }
+        .onChange(of: store.search) { _, query in if !query.isEmpty && store.filter != "trash" { store.filter = "all" }; clearHiddenSelection() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in try? store.reload() }
     }
-
-    private func clearHiddenSelection() {
-        if let selectedID = store.selectedID, !store.filtered.contains(where: { $0.id == selectedID }) {
-            store.selectedID = nil
-        }
-    }
+    private func clearHiddenSelection() { store.selectedIDs.formIntersection(Set(store.filtered.map(\.id))) }
 }

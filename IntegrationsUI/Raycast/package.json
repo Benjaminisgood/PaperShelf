@@ -1,0 +1,91 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "papershelf-local",
+  "title": "PaperShelf",
+  "description": "Search the local PaperShelf library, open papers, and copy citations.",
+  "icon": "icon.png",
+  "author": "papershelf",
+  "license": "MIT",
+  "version": "1.0.0",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "commands": [
+    {
+      "name": "search-papershelf",
+      "title": "Search Papers",
+      "subtitle": "PaperShelf",
+      "description": "Search your local PaperShelf library",
+      "mode": "view"
+    },
+    {
+      "name": "capture-browser-tab",
+      "title": "Capture Browser Tab",
+      "subtitle": "PaperShelf",
+      "description": "Send the active Safari, Chrome, or Edge tab title and URL to PaperShelf for review",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "browser",
+          "type": "dropdown",
+          "placeholder": "Browser",
+          "required": false,
+          "data": [
+            {
+              "title": "Frontmost Browser",
+              "value": "auto"
+            },
+            {
+              "title": "Safari",
+              "value": "safari"
+            },
+            {
+              "title": "Chrome",
+              "value": "chrome"
+            },
+            {
+              "title": "Edge",
+              "value": "edge"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "check-connection",
+      "title": "Check Connection",
+      "subtitle": "PaperShelf",
+      "description": "Check the authenticated local PaperShelf API connection",
+      "mode": "no-view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "connectionFile",
+      "type": "textfield",
+      "required": false,
+      "title": "Connection File",
+      "description": "Optional absolute path to your library's LocalAPI/connection.json. Keep PaperShelf running with Local API enabled.",
+      "placeholder": "~/Library/Application Support/PaperShelf/LocalAPI/connection.json"
+    }
+  ],
+  "scripts": {
+    "build": "ray build --environment dist --output dist --non-interactive",
+    "dev": "ray develop",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@raycast/api": "2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.17",
+    "@types/react": "19.0.10",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "type": "module"
+}

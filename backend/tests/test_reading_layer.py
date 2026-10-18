@@ -1,0 +1,204 @@
+"""Reading usability checks are separate from exact raw coverage checks."""
+import copy
+import json
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from papershelf_pipeline.reading import apply_reading_layer, clean_reading_text
+
+
+def block(identifier, text, page=1, box=(40, 100, 280, 180), size=10, **extra):
+    return {'id': identifier, 'page': page, 'text': text, 'bbox': list(box),
+            'lines': [{'text': text, 'font_size': size, 'direction': [1, 0]}], **extra}
+
+
+def source(*blocks):
+    return {'blocks': list(blocks), 'raw_blocks': copy.deepcopy(list(blocks)),
+            'pages': [{'page': page, 'width': 600, 'height': 800} for page in sorted({b['page'] for b in blocks})]}
+
+
+class ReadingLayerTests(unittest.TestCase):
+    def test_document_evidence_repairs_soft_wraps_but_preserves_compounds(self):
+        value, edits, notes = clean_reading_text('A chem-\nical model uses time-\nresolved and unknown-\ncompound data .\nThe ﬁnal result.',
+                                               {'chemical': 2}, {'time-resolved': 1})
+        self.assertEqual(value, 'A chemical model uses time-resolved and unknown-compound data. The final result.')
+        self.assertTrue(any(e.get('basis') == 'unbroken_spelling_elsewhere_in_document' for e in edits))
+        self.assertTrue(any('unknown-compound' in note for note in notes))
+        self.assertFalse(any('time-resolved' in note for note in notes))
+
+    def test_unknown_equation_font_is_visible_without_guessing_a_minus_or_unit(self):
+        value, _, notes = clean_reading_text('kcal mol\x031\nr ¼ k', prose=False)
+        self.assertEqual(value, 'kcal mol⟦U+0003⟧1\nr ¼ k')
+        self.assertTrue(notes)
+        self.assertNotIn('−1', value)
+
+    def test_source_raw_text_ids_and_all_slices_are_unchanged(self):
+        original = source(block('a', 'A chemical reaction follows this model.\n'), block('b', 'Another chem-\nical paragraph follows here.\n', box=(40, 220, 280, 250)))
+        frozen = copy.deepcopy(original)
+        result = apply_reading_layer(original)
+        self.assertEqual(result['raw_blocks'], frozen['raw_blocks'])
+        for old, new in zip(frozen['blocks'], result['blocks']):
+            for key in old: self.assertEqual(new[key], old[key])
+        self.assertEqual(result['blocks'][1]['reading_text'], 'Another chemical paragraph follows here.')
+        self.assertEqual(result['reading_blocks'][1]['source_ids'], ['b'])
+        self.assertEqual(apply_reading_layer(copy.deepcopy(result)), result, 'Projection must be repeatable')
+
+    def test_repeated_page_furniture_is_excluded_but_captions_and_sections_remain(self):
+        values = []
+        for p in range(1, 4):
+            values += [block(f'h{p}', 'Journal of Example Research', p, (40, 20, 280, 30)),
+                       block(f'c{p}', 'Table 2 Continued measurements', p, (40, 45, 280, 65)),
+                       block(f's{p}', '2 Methods', p, (40, 75, 280, 95)),
+                       block(f'b{p}', 'The complete scientific text remains available here.', p),
+                       block(f'f{p}', f'Journal Example 2026 | {p}', p, (40, 765, 280, 780))]
+        result = apply_reading_layer(source(*values))
+        self.assertEqual({b['id'] for b in result['reading_excluded']}, {f'{prefix}{p}' for prefix in ('h', 'f') for p in range(1, 4)})
+        self.assertTrue(all(b['include_in_reading'] for b in result['blocks'] if b['id'][0] in ('c', 's')))
+        self.assertEqual(result['blocks'][1]['reading_role'], 'caption')
+
+    def test_repository_cover_detected_from_metadata_structure_not_institution(self):
+        result = apply_reading_layer(source(block('cover', 'Some University Repository\nCitation: Example\nPublished Version: DOI\nPermanent Link: URI\nTerms of use: CC\n'),
+                                            block('science', 'Abstract\nThe chemical reaction model follows the available observations.', 2)))
+        self.assertEqual(result['reading_excluded'][0]['kind'], 'repository_cover')
+        self.assertEqual(result['reading_blocks'][0]['source_ids'], ['science'])
+
+    def test_cross_column_continuation_skips_affiliation_but_not_captions(self):
+        result = apply_reading_layer(source(
+            block('left', 'Previous approaches identify these pathways but these\n', box=(40, 620, 280, 680)),
+            block('affiliation', 'Department of Engineering, Example University. E-mail: author@example.test', box=(40, 700, 280, 720), size=7),
+            block('right', 'techniques are limited to simple systems and require prior knowledge.\n', box=(320, 360, 560, 450))))
+        self.assertEqual(result['reading_blocks'][0]['source_ids'], ['left', 'right'])
+        self.assertIn('but these techniques', result['reading_blocks'][0]['text'])
+        blocked = source(block('a', 'This sentence refers to the\n', box=(40, 100, 280, 180)),
+                         block('fig', 'Figure 1 The model overview.', box=(40, 181, 280, 190)),
+                         block('b', 'following process and its outcomes.\n', box=(40, 191, 280, 230)))
+        self.assertEqual(len(apply_reading_layer(blocked)['reading_blocks']), 3)
+
+    def test_cross_page_sentence_joins_with_original_ids_and_page_range(self):
+        result = apply_reading_layer(source(
+            block('a', 'In many complex systems there is limited prior\n', box=(40, 670, 560, 740)),
+            block('footer', '1\n', box=(300, 770, 308, 780), source_role_hint='page_number'),
+            block('b', 'knowledge of the reaction mechanism available from data.\n', page=2, box=(40, 40, 560, 140))))
+        joined = result['reading_blocks'][0]
+        self.assertEqual(joined['id'], 'a')
+        self.assertEqual(joined['source_ids'], ['a', 'b'])
+        self.assertEqual(joined['pages'], [1, 2])
+        self.assertEqual(joined['text'], 'In many complex systems there is limited prior knowledge of the reaction mechanism available from data.')
+
+    def test_complete_sentences_indent_and_document_boundaries_are_not_joined(self):
+        cases = [source(block('a', 'A complete sentence appears here.'), block('b', 'another sentence starts a new paragraph.', box=(40, 182, 280, 230))),
+                 source(block('a', 'A complete clause ends with no mark'), block('b', 'another paragraph begins with indentation.', box=(55, 182, 280, 230))),
+                 source(block('a', 'A main document ends with no mark'), block('b', 'another document must stay separately indexed.', box=(40, 182, 280, 230), document_id='s1'))]
+        for value in cases:
+            with self.subTest(value=value): self.assertEqual(len(apply_reading_layer(value)['reading_blocks']), 2)
+
+    def test_references_are_labeled_and_supplement_science_is_not_lost(self):
+        result = apply_reading_layer(source(block('h', 'References'), block('r', '1 A. Author, A detailed title, Journal, 2024.'),
+                                            block('s', 'Supporting Information'), block('b', 'Here are the complete experimental conditions and results.')))
+        by_id = {b['id']: b for b in result['blocks']}
+        self.assertEqual(by_id['r']['reading_role'], 'reference')
+        self.assertEqual(by_id['b']['reading_role'], 'body')
+        self.assertEqual(len(result['reading_excluded']), 0)
+
+    def test_equation_fragments_are_evidence_not_main_reading_paragraphs(self):
+        result = apply_reading_layer(source(block('eq', '𝑑[A]\n'), block('num', '(3)\n'),
+                                            block('label', 'Ground Truth\n'), block('body', 'The model predicts the measured reaction rate.')))
+        self.assertEqual([b['id'] for b in result['reading_main_blocks']], ['body'])
+        self.assertEqual({b['id'] for b in result['reading_fragments']}, {'eq', 'num', 'label'})
+        self.assertEqual(result['reading_excluded'], [])
+        self.assertTrue(all(b['include_in_reading'] and not b['reading_main'] for b in result['reading_fragments']))
+
+    def test_repeated_scientific_table_labels_are_not_mistaken_for_headers(self):
+        values = [block(f'e{page}', 'Equation', page, (40, 20, 100, 30)) for page in range(1, 4)]
+        values += [block(f's{page}', ';', page, (250, 20, 255, 30)) for page in range(1, 4)]
+        result = apply_reading_layer(source(*values))
+        self.assertFalse(result['reading_excluded'])
+
+    def test_multiline_bibliography_keeps_entries_separate(self):
+        result = apply_reading_layer(source(block('h', 'References', box=(40, 40, 280, 50)),
+                                            block('r1', '(1) Doe, J. A Source Title. Journal', box=(40, 100, 280, 110)),
+                                            block('r2', '2025, 12, 10–19. DOI: 10.1234/example.', box=(40, 112, 280, 125)),
+                                            block('r3', '(2) Smith, K. Another Source.', box=(40, 127, 280, 140))))
+        self.assertEqual([b['source_ids'] for b in result['reading_blocks']], [['h'], ['r1', 'r2'], ['r3']])
+
+    def test_bibliography_institute_and_supporting_for_are_not_affiliation_or_reference_leaks(self):
+        result = apply_reading_layer(source(block('h', 'References'), block('r', 'Institute, 2025, 3, 1–12. Another citation follows.'),
+                                            block('s', 'Supporting Information for'), block('b', 'The experimental conditions below belong to supplementary science.')))
+        by_id = {b['id']: b for b in result['blocks']}
+        self.assertEqual(by_id['r']['reading_role'], 'reference')
+        self.assertTrue(by_id['r']['include_in_reading'])
+        self.assertEqual(by_id['s']['reading_role'], 'heading')
+        self.assertEqual(by_id['b']['reading_role'], 'body')
+
+    def test_alternating_journal_page_number_placement_has_same_footer_signature(self):
+        values = [block(f'f{p}', (f'{p} | Journal Example 2025' if p % 2 else f'Journal Example 2025 | {p}'), p, (40, 765, 280, 780)) for p in range(1, 7)]
+        values += [block(f'b{p}', 'Scientific content remains on this page.', p, (40, 200, 280, 300)) for p in range(1, 7)]
+        result = apply_reading_layer(source(*values))
+        self.assertEqual(len(result['reading_excluded']), 6)
+
+    def test_repeated_page_only_paragraph_is_not_deleted_as_running_header(self):
+        values = [block(f'p{p}', f'Chapter content page {p}. Every paragraph is retained.', p, (50, 60, 480, 72)) for p in range(1, 5)]
+        result = apply_reading_layer(source(*values))
+        self.assertEqual(len(result['reading_main_blocks']), 4)
+        self.assertFalse(result['reading_excluded'])
+
+    def test_short_plain_text_and_bold_pdf_headings_remain_main_reading(self):
+        plain = {'id': 'plain', 'page': 1, 'text': 'Small textual input.'}
+        heading = block('heading', 'Reaction kinetics', box=(40, 120, 280, 140))
+        heading['lines'][0]['font_flags'] = 16
+        result = apply_reading_layer(source(plain, heading))
+        self.assertEqual([b['kind'] for b in result['reading_main_blocks']], ['body', 'heading'])
+
+    def test_short_scientific_statements_remain_in_main_english_text(self):
+        sentences = ['No catalyst was used.', 'The temperature was 300 K.', 'Conversion reached 95%.',
+                     'The reaction stopped.', 'Therefore, the hypothesis failed.', 'No catalyst was used', 'Conversion reached 95%',
+                     'CO formed.', 'No CO formed.', 'H2 increased.', 'CO did not form']
+        result = apply_reading_layer(source(*[block(str(i), text, box=(40, 100 + i * 45, 280, 130 + i * 45)) for i, text in enumerate(sentences)]))
+        self.assertEqual([b['text'] for b in result['reading_main_blocks']], sentences)
+        self.assertFalse(result['reading_excluded'])
+        self.assertFalse(result['reading_fragments'])
+
+    def test_verified_blank_glyph_stays_visible_in_formula_evidence_without_guessing(self):
+        observation = {'source_ids': ['glyph'], 'kind': 'layout_verification', 'observation': '原页显示一个矩阵边界字形，文本层为空白。'}
+        result = apply_reading_layer(source(block('glyph', '\t\n', source_role_hint='whitespace', layout_observations=[observation])))
+        self.assertFalse(result['reading_excluded'])
+        fragment = result['reading_fragments'][0]
+        self.assertEqual(fragment['source_ids'], ['glyph'])
+        self.assertEqual(fragment['kind'], 'equation_fragment')
+        self.assertIn('未映射字形', fragment['text'])
+        self.assertEqual(fragment['layout_observations'], [observation])
+        self.assertEqual(result['blocks'][0]['text'], '\t\n')
+
+    def test_rotated_scientific_axis_is_preserved_but_license_notice_is_separate(self):
+        result = apply_reading_layer(source(
+            block('axis', 'Reaction rate (mol/s)', source_role_hint='marginal'),
+            block('license', 'This article is licensed under a Creative Commons Attribution licence.', source_role_hint='marginal')))
+        self.assertEqual(result['reading_fragments'][0]['source_ids'], ['axis'])
+        self.assertEqual(result['reading_fragments'][0]['text'], 'Reaction rate (mol/s)')
+        self.assertEqual(result['reading_excluded'][0]['source_ids'], ['license'])
+
+    def test_short_equation_functions_are_not_mistaken_for_short_prose(self):
+        result = apply_reading_layer(source(block('ln', 'ln 𝑘= ln 𝐴+ 𝑏ln 𝑇−'),
+                                            block('exp', '𝑟= exp(ln𝑘+ 𝑣𝐴ln[𝐴] + 𝑣𝐵ln[𝐵]) (3)')))
+        self.assertFalse(result['reading_main_blocks'])
+        self.assertEqual(len(result['reading_fragments']), 2)
+
+    def test_attested_split_word_crosses_inline_formula_fragments_without_losing_them(self):
+        result = apply_reading_layer(source(
+            block('word', 'A chemical reaction is explicitly named here.', box=(40, 40, 280, 60)),
+            block('a', 'The resulting model contains another chem-\n', box=(40, 100, 280, 120)),
+            block('glyph', '∑\n', box=(190, 118, 197, 127)),
+            block('b', 'ical reaction that follows the rate law.', box=(40, 130, 280, 150))))
+        joined = next(b for b in result['reading_main_blocks'] if b['id'] == 'a')
+        self.assertEqual(joined['source_ids'], ['a', 'b'])
+        self.assertIn('another chemical reaction', joined['text'])
+        self.assertEqual(joined['linked_layout_source_ids'], ['glyph'])
+        self.assertEqual(result['reading_fragments'][0]['source_ids'], ['glyph'])
+
+    def test_duplicate_source_ids_fail_instead_of_silently_aliasing(self):
+        with self.assertRaises(ValueError): apply_reading_layer(source(block('same', 'First complete source paragraph.'), block('same', 'Second complete source paragraph.')))
+
+
+if __name__ == '__main__': unittest.main()

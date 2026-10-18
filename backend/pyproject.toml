@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "papershelf-pipeline"
+version = "0.1.0"
+description = "Evidence-grounded literature learning guides, extraction and paper agents"
+requires-python = ">=3.10"
+dependencies = ["pymupdf>=1.24", "latex2mathml>=3.77"]
+
+[project.scripts]
+papershelf-pipeline = "papershelf_pipeline.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["papershelf_pipeline*"]

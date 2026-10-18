@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>采集到 PaperShelf</title><link rel="stylesheet" href="popup.css"></head>
+<body><header><img src="icons/icon-48.png" width="32" height="32" alt=""><div><h1>采集到 PaperShelf</h1><p>核对信息，再交给本机应用确认</p></div></header>
+<p id="status" role="status" aria-live="polite">正在读取当前页面…</p>
+<form id="capture" hidden>
+<label>标题<input id="title" required></label>
+<label>作者 <span>每行一位</span><textarea id="authors" rows="2"></textarea></label>
+<div class="row"><label>年份<input id="year" inputmode="numeric"></label><label>期刊<input id="journal"></label></div>
+<label>DOI<input id="doi"></label><label>来源<input id="sourceURL" readonly></label>
+<details><summary>摘要与选中文字</summary><label>摘要<textarea id="abstract" rows="4"></textarea></label><label>选中文字<textarea id="selectedText" rows="4"></textarea></label></details>
+<label>PDF 候选 <span>每行一个公开地址，可编辑或移除</span><textarea id="pdfURLs" rows="2"></textarea></label>
+<p class="hint">只读取本次页面；不传送 Cookie、登录凭据或浏览历史。PDF 下载在应用中另行确认，需要登录的 PDF 请先在浏览器保存。</p>
+<button type="submit" id="send">在 PaperShelf 中确认</button>
+<p id="handoff" hidden>若系统未打开应用，可<a id="retry" href="#">再次打开 PaperShelf</a>。请先安装并启动一次 PaperShelf。</p>
+</form><script src="protocol.js"></script><script src="popup.js"></script></body></html>

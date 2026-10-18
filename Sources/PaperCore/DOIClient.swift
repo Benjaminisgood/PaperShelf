@@ -87,7 +87,11 @@ public struct DOIClient {
         return Reference(title: plainText(title), authors: authors, year: year,
                          journal: (message["container-title"] as? [String])?.first.map(plainText) ?? "",
                          doi: returnedDOI, url: message["URL"] as? String ?? "https://doi.org/\(returnedDOI)",
-                         abstract: plainText(message["abstract"] as? String ?? ""))
+                         abstract: plainText(message["abstract"] as? String ?? ""),
+                         entryType: ["book": "book", "book-chapter": "incollection", "proceedings-article": "inproceedings", "dissertation": "phdthesis", "report": "techreport"][message["type"] as? String ?? ""] ?? "article",
+                         volume: message["volume"] as? String ?? "", issue: message["issue"] as? String ?? "",
+                         pages: message["page"] as? String ?? "", publisher: message["publisher"] as? String ?? "",
+                         isbn: (message["ISBN"] as? [String])?.first ?? "", issn: (message["ISSN"] as? [String])?.first ?? "")
     }
 
     private func plainText(_ value: String) -> String {

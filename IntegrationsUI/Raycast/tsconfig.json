@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"], "target": "ES2023", "module": "ESNext", "moduleResolution": "Bundler",
+    "jsx": "react-jsx", "strict": true, "noEmit": true, "esModuleInterop": true, "skipLibCheck": true,
+    "allowImportingTsExtensions": true, "types": ["node", "react"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
+}

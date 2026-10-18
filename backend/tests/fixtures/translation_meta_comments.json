@@ -1,0 +1,34 @@
+[
+  {
+    "block": {
+      "id": "p7-g280",
+      "page": 7,
+      "text": "Fig. 7\n(a) The predictions and uncertainty quantification of the reversible enzyme–substrate reactions. The shaded regions indicate 4 standard\ndeviations. (b) The comparison between CRNN with (solid lines) and without (dashed lines) considering eqn (19) when model a hypothetical reversible\nreaction E þ S Ð\n",
+      "source_anchor": "Fig. 7 (a) The predictions and uncertainty quantification of the reversible enzyme–substrate rea"
+    },
+    "paragraph": {
+      "source_id": "p7-g280",
+      "source_anchor": "Fig. 7 (a) The predictions and uncertainty quantification of the reversible enzyme–substrate rea",
+      "explanation": "原文在 'rea' 处截断，且后续文本包含换行符导致的断词（E þ S Ð）。根据校验错误提示，需完整译述可见部分。由于原文本身在此 block 内不完整（以 'rea' 结尾，且下一句从 '(b)' 开始但被截断或属于同一图注的不同部分），此处仅对提供的文本进行忠实译述。注意：原文 'E þ S Ð' 疑似为 'E + S ⇌' 的编码错误或排版错误，保留原貌并在 reasoning 中说明。",
+      "translation_units": [],
+      "key_sentence": "The shaded regions indicate 4 standard deviations.",
+      "reasoning": "本段为图注，描述图7(a)和(b)的内容。由于 source text 在 'rea' 处中断，且未提供完整的 (b) 部分后续文本，无法构成完整段落译述。此处指出原文截断情况。关键句选自完整句子。"
+    }
+  },
+  {
+    "block": {
+      "id": "p8-g290",
+      "page": 8,
+      "text": "In this section, we demonstrate the B-CRNN on catalytic reac-\ntions with a weight decoupling modification. The reaction\nsystem considered in this section is the mitogen activated\nprotein kinases (MAPK) pathway.39 Mathematically, the MAPK\npathway\nis\nmodeled\nusing\nthe\nfollowing\nreaction\nrate\nequations.\n",
+      "source_anchor": "In this section, we demonstrate the B-CRNN on catalytic reac- tions with a weight decoupling mod"
+    },
+    "paragraph": {
+      "source_id": "p8-g290",
+      "source_anchor": "In this section, we demonstrate the B-CRNN on catalytic reac- tions with a weight decoupling mod",
+      "explanation": "原文在 'mod' 处截断（应为 modification）。需完整译述可见部分。",
+      "translation_units": [],
+      "key_sentence": "Mathematically, the MAPK pathway is modeled using the following reaction rate equations.",
+      "reasoning": "本段引入 B-CRNN 在催化反应中的应用，具体为 MAPK 通路。原文在 'mod' 处截断，未能完整表达 'modification'。关键句选自完整句子，说明数学建模方法。"
+    }
+  }
+]
