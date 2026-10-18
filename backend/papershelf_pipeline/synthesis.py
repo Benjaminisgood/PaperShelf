@@ -360,10 +360,35 @@ def polish_reading(source: dict, learning: dict, provider, run_dir: Path, progre
     return polished
 
 
+def source_reference_errors(output: dict, allowed: set[str]) -> list[str]:
+    errors = []
+    for section,values in output.items():
+        if section not in {'thematic_sections','methods','findings','critique','transfer','quiz','glossary'} or not isinstance(values,list):
+            continue
+        for index,item in enumerate(values):
+            if not isinstance(item,dict):
+                continue
+            paragraphs = item.get('paragraphs',[]) if section=='thematic_sections' else [item]
+            if not isinstance(paragraphs,list):
+                continue
+            for paragraph_index,paragraph in enumerate(paragraphs):
+                if not isinstance(paragraph,dict):
+                    continue
+                ids = paragraph.get('source_ids')
+                invalid = [identifier for identifier in ids if not isinstance(identifier,str) or identifier not in allowed] if isinstance(ids,list) else []
+                if not isinstance(ids,list) or not ids or invalid:
+                    location = f'{section}[{index}].paragraphs[{paragraph_index}]' if section=='thematic_sections' else f'{section}[{index}]'
+                    errors.append(f'{location} 缺少有效canonical source_ids：actual={ids!r}；不存在或无效的ID={invalid!r}。只可引用source_evidence中实际存在且支持该条论断的ID，不能按页码猜造ID。')
+    return errors
+
+
 def validate_themes(sections, sources: list[dict], *, allow_empty=False) -> list[dict]:
     allowed = {source['id'] for source in sources}
     if not isinstance(sections, list) or (not sections and not allow_empty):
         raise PipelineError('thematic_sections必须提供与正文相符的连贯中文主题讲解，不能只有概览或逐段碎片。')
+    reference_errors = source_reference_errors({'thematic_sections':sections},allowed)
+    if reference_errors:
+        raise PipelineError('\n'.join(reference_errors))
     for section in sections:
         if not isinstance(section, dict) or not isinstance(section.get('title'), str) or not section['title'].strip():
             raise PipelineError('主题缺少具体标题。')
@@ -531,12 +556,16 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
                 if not isinstance(review, list) or len(review) != len(expected) or {item.get('input_id') for item in review if isinstance(item, dict)} != expected:
                     raise PipelineError('全篇合并coverage必须逐项说明每个输入，不能漏掉原稿。')
                 input_map = {entry['input_id']:entry for entry in batch}
+                output_errors = source_reference_errors(output,allowed_ids)
                 for row in review:
                     if row.get('action') not in {'retained', 'merged', 'excluded'} or not isinstance(row.get('reason'), str) or not row['reason'].strip():
-                        raise PipelineError('全篇合并缺少具体保留/合并/排除理由。')
+                        output_errors.append(f'coverage {row.get("input_id")} 缺少有效保留/合并/排除理由：action={row.get("action")!r}, reason={row.get("reason")!r}。')
                     entry = input_map[row['input_id']]
-                    if row['action'] == 'excluded' and any(source_map[i].get('reading_role') not in nonresearch_roles for i in item_ids(entry['value'])):
-                        raise PipelineError('科学内容不可排除；重复内容须合并并保留全部来源和不同条件。')
+                    research_ids = sorted(i for i in item_ids(entry['value']) if source_map[i].get('reading_role') not in nonresearch_roles)
+                    if row.get('action') == 'excluded' and research_ids:
+                        output_errors.append(f'coverage {row["input_id"]} 科学内容不可排除：reason={row.get("reason")!r}，科研来源={research_ids}。重复内容须action=merged，错误定义须依据原文纠正后retained/merged；保留全部独有条件，错引用须用citation_correction及逐字证据纠正。')
+                if output_errors:
+                    raise PipelineError('\n'.join(output_errors))
                 for key in combined:
                     values = output.get(key)
                     if not isinstance(values, list):
@@ -553,33 +582,39 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
                             kind = item.setdefault('kind', 'inference' if key=='transfer' else ('uncertain' if key=='critique' else 'source'))
                             if kind not in {'source','background','inference','uncertain'}:
                                 raise PipelineError(f'全篇合并{key}缺少有效来源性质kind。')
+                coverage_errors = []
                 for row in review:
-                    entry = input_map[row['input_id']]
-                    covered = set().union(*(item_ids(item) for item in output[entry['section']]))
-                    expected_ids = item_ids(entry['value'])
-                    correction = row.get('citation_correction')
-                    if correction is not None:
-                        if not isinstance(correction,dict) or set(correction.get('original_source_ids',[]))!=expected_ids:
-                            raise PipelineError('引用纠正须完整保留原始source_ids供审计。')
-                        corrected=correction.get('corrected_source_ids')
-                        if not isinstance(corrected,list) or not corrected or any(identifier not in source_map for identifier in corrected) or not str(correction.get('reason','')).strip():
-                            raise PipelineError('引用纠正缺少真实canonical来源或具体理由。')
-                        quotes=correction.get('evidence')
-                        if not isinstance(quotes,list) or not quotes:
-                            raise PipelineError('引用纠正必须提供对应来源的逐字证据。')
-                        from .generation import canonicalize_evidence
-                        for quote in quotes:
-                            block=source_map.get(quote.get('block_id')) if isinstance(quote,dict) else None
-                            if not block or block['id'] not in corrected:
-                                raise PipelineError('引用纠正证据引用了错误来源。')
-                            canonicalize_evidence(quote,block)
-                            if quote.get('page')!=block['page'] or not quote.get('quote') or normalize_quote(quote['quote']) not in normalize_quote(block['text']):
-                                raise PipelineError('引用纠正证据引文无法逐字核对。')
-                        if not set(corrected)<={quote['block_id'] for quote in quotes}:
-                            raise PipelineError('引用纠正后每个来源都须有对应逐字证据。')
-                        expected_ids=set(corrected)
-                    if row['action'] != 'excluded' and not expected_ids <= covered:
-                        raise PipelineError(f'全篇合并{entry["input_id"]}声称保留/合并但输出没有保留核对后的全部来源。')
+                    try:
+                        entry = input_map[row['input_id']]
+                        covered = set().union(*(item_ids(item) for item in output[entry['section']]))
+                        expected_ids = item_ids(entry['value'])
+                        correction = row.get('citation_correction')
+                        if correction is not None:
+                            if not isinstance(correction,dict) or set(correction.get('original_source_ids',[]))!=expected_ids:
+                                raise PipelineError(f'coverage {row["input_id"]} 引用纠正须完整保留原始source_ids供审计；expected={sorted(expected_ids)}，actual={correction.get("original_source_ids") if isinstance(correction,dict) else correction!r}。')
+                            corrected=correction.get('corrected_source_ids')
+                            if not isinstance(corrected,list) or not corrected or any(identifier not in source_map for identifier in corrected) or not str(correction.get('reason','')).strip():
+                                raise PipelineError(f'coverage {row["input_id"]} 引用纠正缺少真实canonical来源或具体理由；corrected_source_ids={corrected!r}，reason={correction.get("reason")!r}。')
+                            quotes=correction.get('evidence')
+                            if not isinstance(quotes,list) or not quotes:
+                                raise PipelineError(f'coverage {row["input_id"]} 引用纠正必须提供对应来源的逐字证据；corrected_source_ids={corrected!r}。')
+                            from .generation import canonicalize_evidence
+                            for quote in quotes:
+                                block=source_map.get(quote.get('block_id')) if isinstance(quote,dict) else None
+                                if not block or block['id'] not in corrected:
+                                    raise PipelineError(f'coverage {row["input_id"]} 引用纠正证据引用了错误来源：quote.block_id={quote.get("block_id") if isinstance(quote,dict) else quote!r}；必须属于corrected_source_ids={corrected!r}。')
+                                canonicalize_evidence(quote,block)
+                                if quote.get('page')!=block['page'] or not quote.get('quote') or normalize_quote(quote['quote']) not in normalize_quote(block['text']):
+                                    raise PipelineError(f'coverage {row["input_id"]} 引用纠正证据引文无法逐字核对：block_id={block["id"]}，expected_page={block["page"]}，actual_page={quote.get("page")!r}，quote={quote.get("quote")!r}。')
+                            if not set(corrected)<={quote['block_id'] for quote in quotes}:
+                                raise PipelineError(f'coverage {row["input_id"]} 引用纠正后每个来源都须有对应逐字证据；缺少{sorted(set(corrected)-{quote["block_id"] for quote in quotes})}。')
+                            expected_ids=set(corrected)
+                        if row['action'] != 'excluded' and not expected_ids <= covered:
+                            raise PipelineError(f'全篇合并{entry["input_id"]}声称保留/合并但输出没有保留核对后的全部来源；section={entry["section"]}，缺少ID={sorted(expected_ids-covered)}。')
+                    except PipelineError as error:
+                        coverage_errors.append(str(error))
+                if coverage_errors:
+                    raise PipelineError('\n'.join(coverage_errors))
                 break
             except PipelineCancelled:
                 raise

@@ -119,6 +119,51 @@ class SynthesisTests(unittest.TestCase):
         self.assertIn('findings',calls[1]['validation_error'])
         self.assertIn('glossary',calls[1]['validation_error'])
 
+    def test_consolidation_feedback_identifies_all_bad_sources_and_excluded_input_ids(self):
+        learning={'methods':[{'title':'条件','body':'完整保留条件。','source_ids':['p1-b1'],'kind':'source'}],
+                  'findings':[{'title':'结果','body':'完整保留结果。','source_ids':['p1-b2'],'kind':'source'}]}
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt);output=chunk_response(request)
+                if 'items' in request:
+                    calls.append(request)
+                    if len(calls)==1:
+                        output['methods'][0]['source_ids']=['invented-method-source']
+                        output['findings'][0]['source_ids']=['invented-finding-source']
+                        for row in output['coverage']:
+                            row.update(action='excluded',reason='重复内容，试图排除。')
+                return output
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'chunks').mkdir()
+            consolidate_learning(learning,self.source,Provider(),root,lambda _:None)
+        error=calls[1]['validation_error']
+        for expected in ('methods[0]','findings[0]','invented-method-source','invented-finding-source','coverage methods-1','coverage findings-1','重复内容，试图排除。'):
+            self.assertIn(expected,error)
+
+    def test_consolidation_feedback_lists_all_missing_coverage_and_quote_evidence(self):
+        learning={'methods':[{'title':'条件','body':'完整条件。','source_ids':['p1-b1'],'kind':'source'}],
+                  'findings':[{'title':'结果','body':'完整结果。','source_ids':['p1-b2'],'kind':'source'}],
+                  'transfer':[{'title':'迁移','body':'迁移范围。','source_ids':['p1-b1'],'kind':'inference'}]}
+        calls=[]
+        class Provider:
+            def json(self,system,prompt):
+                request=json.loads(prompt);output=chunk_response(request)
+                if 'items' in request:
+                    calls.append(request)
+                    if len(calls)==1:
+                        output['methods'][0]['source_ids']=['p1-b2']
+                        output['findings'][0]['source_ids']=['p1-b1']
+                        row=next(row for row in output['coverage'] if row['input_id']=='transfer-1')
+                        row['citation_correction']={'original_source_ids':['p1-b1'],'corrected_source_ids':['p1-b1','p1-b2'],'reason':'补充确切条件。','evidence':[{'block_id':'p1-b1','page':1,'quote':'The reaction proceeds at 25 °C.'}]}
+                return output
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'chunks').mkdir()
+            consolidate_learning(learning,self.source,Provider(),root,lambda _:None)
+        error=calls[1]['validation_error']
+        for expected in ('methods-1','findings-1','coverage transfer-1',"缺少ID=['p1-b1']","缺少ID=['p1-b2']","缺少['p1-b2']"):
+            self.assertIn(expected,error)
+
     def test_consolidation_resume_revalidates_completed_batch_with_identical_input(self):
         initial={'methods':[{'title':'条件','body':'完整保留条件。','source_ids':['p1-b1'],'kind':'source'}]}
         for changed in (False,True):
