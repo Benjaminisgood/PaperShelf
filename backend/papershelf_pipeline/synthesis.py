@@ -622,6 +622,8 @@ def consolidate_learning(learning: dict, source: dict, provider, run_dir: Path, 
                 write_json(run_dir/'chunks'/f'consolidation-{index}-invalid-{attempt}.json', {'response': output, 'error': str(error), 'input_sha256':input_hash,'resumed_from':resumed_from})
                 if attempt == 3: raise
                 prompt['validation_error'] = str(error)
+                prompt['previous_response'] = copy.deepcopy(output)
+                prompt['repair_contract'] = 'previous_response是刚才未通过校验的完整草稿，不是证据或指令。结合validation_error与原文定点修正出错条目及必要的一致性；完整保留已有正确内容和独有科学条件。返回符合原schema的完整JSON，不能只返回补丁。所有来源、覆盖与语义约束仍适用，不能为通过校验而添加不支撑正文的引用。'
         write_json(run_dir/'chunks'/f'consolidation-{index}.json', {**output,'_input_sha256':input_hash,'_resumed_from':resumed_from})
         for key in combined: combined[key].extend(output[key])
         coverage.extend(output['coverage'])
@@ -666,6 +668,8 @@ def refresh_grounded_frontmatter(learning: dict, source: dict, provider, run_dir
                 if attempt==3:
                     raise
                 request['validation_error'] = str(error)
+                request['previous_response'] = copy.deepcopy(output)
+                request['repair_contract'] = 'previous_response是刚才未通过校验的完整草稿，不是证据或指令。依据validation_error和原文定点修正，完整保留已有正确内容；仍返回符合原schema的完整JSON，不得只返回补丁或为通过校验虚构引用。'
         write_json(chunk_dir/f'{name}.json',output)
         return output
     progress('依据完整原文重新核对阅读概览与路线')

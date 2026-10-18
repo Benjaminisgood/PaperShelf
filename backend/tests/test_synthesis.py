@@ -137,6 +137,10 @@ class SynthesisTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);(root/'chunks').mkdir()
             consolidate_learning(learning,self.source,Provider(),root,lambda _:None)
+            failed=json.loads((root/'chunks/consolidation-1-invalid-1.json').read_text())
+        self.assertNotIn('previous_response',calls[0])
+        self.assertEqual(calls[1]['previous_response'],failed['response'])
+        self.assertIn('完整JSON',calls[1]['repair_contract'])
         error=calls[1]['validation_error']
         for expected in ('methods[0]','findings[0]','invented-method-source','invented-finding-source','coverage methods-1','coverage findings-1','重复内容，试图排除。'):
             self.assertIn(expected,error)
@@ -201,6 +205,32 @@ class SynthesisTests(unittest.TestCase):
         self.assertEqual(learning['gaps'],[])
         self.assertEqual(learning['gaps_drafts'],['局部草稿声称未报告速率常数。'])
         self.assertEqual(learning['reviewed_gaps'][0]['source_ids'],['p1-b2'])
+
+    def test_grounded_retry_repairs_previous_response_and_keeps_valid_prose(self):
+        learning={'overview':'旧概览','reading_route':['旧路线'],'gaps':['未找到速率。']}
+        calls=[]
+        class Provider:
+            def json(inner,system,prompt):
+                request=json.loads(prompt);calls.append(request)
+                if len(calls)==1:
+                    output=chunk_response(request)
+                    output['overview']='反应在25 °C进行，速率常数为2 s^-1。'
+                    output['reviewed_gaps']=[{'input_gap_id':'gap-001','text':'第二段已经报告速率常数。','source_ids':['wrong-id'],'status':'resolved','reason':'完整原文给出条件与速率。'}]
+                else:
+                    output=copy.deepcopy(request['previous_response'])
+                    output['reviewed_gaps'][0]['source_ids']=['p1-b2']
+                return output
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            refresh_grounded_frontmatter(learning,self.source,Provider(),root,lambda _:None)
+            failed=json.loads((root/'chunks/grounded-overview-invalid-1.json').read_text())
+        self.assertEqual(len(calls),2)
+        self.assertNotIn('previous_response',calls[0])
+        self.assertEqual(calls[1]['previous_response'],failed['response'])
+        self.assertIn('完整JSON',calls[1]['repair_contract'])
+        self.assertEqual(learning['overview'],failed['response']['overview'])
+        self.assertEqual(learning['reviewed_gaps'][0]['source_ids'],['p1-b2'])
+        self.assertEqual(learning['gaps'],[])
 
     def test_scientific_sentence_splitter_keeps_references_and_all_characters(self):
         text='Typical loss curves are presented in Fig. S1. The law follows Eq. A. Dr. Smith et al. Report it as No. A, e.g. Data from Fig. 7b. Next we compare the methods.'
