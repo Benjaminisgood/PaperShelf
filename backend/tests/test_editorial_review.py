@@ -179,6 +179,40 @@ class EditorialReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(PipelineError, '新增学习条目引用'):
                 load_editorial_review(path, source)
 
+    def test_frontmatter_and_gap_corrections_stay_synchronized_without_dropping_other_gaps(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            page = root / 'page.png'
+            page.write_bytes(b'page')
+            source = {'sha256': 'hash', 'blocks': [{'id': 'a', 'page': 1, 'text': 'Source evidence'}], 'figures': [{'page': 1, 'path': str(page)}]}
+            verification = {'pages': [1], 'page_image_sha256': {'1': sha256(page)}, 'method': 'fixture review'}
+            learning = {'overview': 'Old overview', 'reading_route': ['Old step', 'Unchanged step'],
+                        'reviewed_gaps': [{'text': 'Old gap', 'reason': 'Evidence', 'status': 'retained', 'source_ids': ['a']}],
+                        'gaps': ['Old gap', 'Another scientific uncertainty']}
+            bundle = {'source_sha256': 'hash', 'reviewer': 'fixture', 'frontmatter_corrections': [
+                {'field': 'overview', 'original': 'Old overview', 'corrected': 'Reviewed overview', 'source_ids': ['a'], 'why': 'Evidence', 'verification': verification},
+                {'field': 'reading_route', 'original': ['Old step', 'Unchanged step'], 'corrected': ['Reviewed step', 'Unchanged step'], 'source_ids': ['a'], 'why': 'Evidence', 'verification': verification}],
+                'content_corrections': [{'section': 'reviewed_gaps', 'field': 'text', 'original': 'Old gap', 'corrected': 'Original sign remains uncertain',
+                                         'source_ids': ['a'], 'why': 'Preserve actual source ambiguity', 'verification': verification}]}
+            path = root / 'review.json'
+            write_json(path, bundle)
+            load_editorial_review(path, source)
+            apply_editorial_review(learning, source, bundle, root, require_exact=True)
+            self.assertEqual(learning['overview'], 'Reviewed overview')
+            self.assertEqual(learning['reading_route'], ['Reviewed step', 'Unchanged step'])
+            self.assertEqual(learning['gaps'], ['Original sign remains uncertain', 'Another scientific uncertainty'])
+            self.assertEqual(learning['reviewed_gaps'][0]['text'], learning['gaps'][0])
+            self.assertEqual(learning['reviewed_gaps'][0]['status'], 'retained')
+            apply_editorial_review(learning, source, bundle, root, require_exact=True)
+            self.assertTrue(all(record['status'] == 'already_applied' for record in learning['editorial_review']['records']))
+            learning['reading_route'][0] = 'New unreviewed step'
+            with self.assertRaisesRegex(PipelineError, '未匹配完整原值'):
+                apply_editorial_review(learning, source, bundle, root, require_exact=True)
+            bundle['frontmatter_corrections'][1]['corrected'] = []
+            write_json(path, bundle)
+            with self.assertRaisesRegex(PipelineError, '完整非空'):
+                load_editorial_review(path, source)
+
     def test_source_bound_caveat_is_visible_beside_original_and_translation_without_rewriting(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)

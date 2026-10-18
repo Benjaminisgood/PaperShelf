@@ -30,7 +30,7 @@ def load_editorial_review(path, source):
     previews = {(item.get('document_id', 'main'), item['page']): item['path'] for item in source.get('figures', []) if item.get('path')}
     equation_keys = set()
     equation_aliases = {}
-    for section in ('equations', 'content_corrections', 'annotation_corrections', 'semantic_constraints', 'reading_notes'):
+    for section in ('equations', 'content_corrections', 'frontmatter_corrections', 'annotation_corrections', 'semantic_constraints', 'reading_notes'):
         items = bundle.get(section, [])
         if not isinstance(items, list):
             raise PipelineError(f'校订证据 {section} 必须为数组。')
@@ -87,6 +87,8 @@ def load_editorial_review(path, source):
             elif section == 'content_corrections':
                 if any(not isinstance(item.get(key), str) or not item[key] for key in ('section', 'field', 'original', 'corrected', 'why')):
                     raise PipelineError('正文修正须提供原值、新值及原因。')
+                if item['section'] == 'reviewed_gaps' and item['field'] not in {'text', 'reason'}:
+                    raise PipelineError('科学缺口审校只修改文字及核验理由，不静默改变处理状态。')
                 if item['section'] == 'clean_reading' and (item['field'] not in {'text', 'translation'} or not isinstance(item.get('reading_group_id'), str)):
                     raise PipelineError('阅读正文修订须指定reading_group_id及text或translation。')
                 follow = item.get('required_follow_through', {})
@@ -103,6 +105,22 @@ def load_editorial_review(path, source):
                 quoted = {quote['block_id'] for quote in item.get('source_evidence', [])}
                 if not (set(corrected_ids) - set(ids)).issubset(quoted):
                     raise PipelineError('每个新增学习条目引用都须有对应逐字来源证据。')
+            elif section == 'frontmatter_corrections':
+                field = item.get('field')
+                if field not in {'overview', 'reading_route'} or not isinstance(item.get('why'), str) or not item['why']:
+                    raise PipelineError('概览修订须指定overview或reading_route及原因。')
+                for key in ('original', 'corrected'):
+                    value = item.get(key)
+                    if field == 'overview':
+                        valid = isinstance(value, str) and bool(value.strip())
+                    else:
+                        valid = isinstance(value, list) and bool(value) and all(isinstance(step, str) and step.strip() for step in value)
+                    if not valid:
+                        raise PipelineError('概览修订须提供完整非空原值和新值，阅读路线为文字数组。')
+                for quote in item.get('source_evidence', []):
+                    block = blocks.get(quote.get('block_id')) if isinstance(quote, dict) else None
+                    if not block or block['id'] not in evidence_ids or quote.get('page') != block['page'] or not isinstance(quote.get('quote'), str) or not quote['quote'] or quote['quote'] not in block['text']:
+                        raise PipelineError('概览修订的逐字来源证据不匹配。')
             elif section == 'annotation_corrections':
                 if item.get('field') != 'editing_notes' or not isinstance(item.get('reading_group_id'), str) or not item['reading_group_id'] or not isinstance(item.get('why'), str) or not item['why']:
                     raise PipelineError('编辑说明修订须指定阅读组、editing_notes字段及原因。')
@@ -228,6 +246,9 @@ def apply_editorial_review(learning, source, bundle, directory, *, require_exact
                     item['source_ids'] = list(expected_ids)
                 if correction['section'] == 'clean_reading':
                     _synchronize_reading_correction(item, correction, learning, bundle)
+                elif correction['section'] == 'reviewed_gaps' and correction['field'] == 'text':
+                    learning['gaps'] = [correction['corrected'] if gap == correction['original'] else gap
+                                        for gap in learning.get('gaps', [])]
         if require_exact and not locations and not already:
             raise PipelineError(f'审校修订{correction.get("id", correction["section"])}未匹配任何原值或已修订值；已停止另存，原版本保持不变。')
         records.append({**correction, 'status': 'applied_exact_match' if locations else ('already_applied' if already else 'retained_as_grounding_constraint'),
@@ -236,6 +257,17 @@ def apply_editorial_review(learning, source, bundle, directory, *, require_exact
         for section in sections.get('thematic_sections', []):
             section['source_ids'] = list(dict.fromkeys(identifier for paragraph in section.get('paragraphs', [])
                                                        for identifier in paragraph.get('source_ids', [])))
+    for correction in bundle.get('frontmatter_corrections', []):
+        field = correction['field']
+        value = learning.get(field)
+        if value not in (correction['original'], correction['corrected']):
+            if require_exact:
+                raise PipelineError(f'概览修订{correction.get("id", field)}未匹配完整原值或已修订值。')
+            records.append({**correction, 'kind': 'frontmatter_correction', 'status': 'retained_as_grounding_constraint', 'locations': []})
+            continue
+        already = value == correction['corrected']
+        learning[field] = copy.deepcopy(correction['corrected'])
+        records.append({**correction, 'kind': 'frontmatter_correction', 'status': 'already_applied' if already else 'applied_exact_match', 'locations': [field]})
     for correction in bundle.get('annotation_corrections', []):
         matches = [item for item in learning.get('clean_reading', []) if item.get('id') == correction['reading_group_id']
                    and set(item.get('source_ids', [])) == set(correction['source_ids'])]
