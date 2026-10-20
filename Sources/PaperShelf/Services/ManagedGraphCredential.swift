@@ -7,6 +7,7 @@ enum ManagedGraphCredential {
     static func password(for configuration: [String: Any]) -> String? {
         guard (configuration["backend"] as? String ?? "neo4j") == "neo4j",
               configuration["uri"] as? String == "bolt://127.0.0.1:17687",
+              (configuration["user"] as? String ?? "neo4j") == "neo4j",
               (configuration["password_environment"] as? String ?? "NEO4J_PASSWORD") == "NEO4J_PASSWORD" else { return nil }
         let file = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("PaperShelf/graph-service/neo4j.env")

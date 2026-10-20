@@ -66,7 +66,7 @@ struct LibraryTable: View {
                 Button("快速查看") { preview(ids.first) }.disabled(item(for: ids.first)?.pdfPath == nil && attachment(for: ids.first) == nil)
                 Button("在 Finder 中显示") { open(ids.first, reveal: true) }
                 Divider()
-                Button("编辑元数据…") { store.editingReference = item(for: ids.first) }
+                Button("编辑元数据") { store.editingReference = item(for: ids.first) }
                 Button("复制 BibTeX") { select(ids); store.copyReferences(.bibtex) }
                 Button("复制 RIS") { select(ids); store.copyReferences(.ris) }
                 Button("复制 DOI") { select(ids); store.copySelectedDOIs() }

@@ -17,10 +17,27 @@ extension LibraryStore {
 
     func editCollection(_ collection: LibraryCollection? = nil, parentID: UUID? = nil) {
         guard let name = organizationInput(title: collection == nil ? "新建文集" : "重命名文集", value: collection?.name ?? ""), !name.isEmpty else { return }
+        if let value = saveCollection(name: name, collection: collection, parentID: parentID) { filter = "c:\(value.id)" }
+    }
+
+    /// Shared by inline creation and renaming. This deliberately leaves the current filter alone.
+    @discardableResult func saveCollection(name: String, collection: LibraryCollection? = nil, parentID: UUID? = nil) -> LibraryCollection? {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
         do {
-            var value = collection ?? LibraryCollection(name: name, parentID: parentID, sortOrder: (sortedCollections(parent: parentID).map(\.sortOrder).max() ?? -1) + 1)
-            value.name = name; try requireDatabase().upsertCollection(value); try reload(); filter = "c:\(value.id)"
-        } catch { self.error = error.localizedDescription }
+            if collection == nil, let existing = collectionRecords.first(where: { $0.parentID == parentID && $0.name == name }) { return existing }
+            var value: LibraryCollection
+            if let collection {
+                guard let current = collectionRecords.first(where: { $0.id == collection.id }) else { return nil }
+                value = current
+            } else {
+                value = LibraryCollection(name: name, parentID: parentID, sortOrder: (sortedCollections(parent: parentID).map(\.sortOrder).max() ?? -1) + 1)
+            }
+            value.name = name
+            try requireDatabase().upsertCollection(value); try reload()
+            status = collection == nil ? "已新建文集" : "已重命名文集"
+            return value
+        } catch { self.error = error.localizedDescription; return nil }
     }
 
     func deleteCollection(_ collection: LibraryCollection) {
@@ -74,18 +91,28 @@ extension LibraryStore {
 
     func addTag() {
         guard let value = organizationInput(title: "新建标签"), !value.isEmpty else { return }
-        do {
-            if !tagRecords.contains(where: { $0.name == value }) { try requireDatabase().upsertTag(LibraryTag(name: value, sortOrder: (tagRecords.map(\.sortOrder).max() ?? -1) + 1)) }
-            try reload()
-        } catch { self.error = error.localizedDescription }
+        _ = saveTag(name: value)
     }
 
     func renameTag(_ name: String) {
         guard let value = organizationInput(title: "重命名标签", value: name), !value.isEmpty, value != name else { return }
+        _ = saveTag(name: value, renaming: name)
+    }
+
+    @discardableResult func saveTag(name: String, renaming oldName: String? = nil) -> Bool {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return false }
         do {
-            try requireDatabase().renameTag(from: name, to: value); try reload()
-            if filter == "t:" + name { filter = "t:" + value }; status = "已重命名标签"
-        } catch { self.error = error.localizedDescription }
+            if let oldName {
+                guard oldName != name else { return true }
+                try requireDatabase().renameTag(from: oldName, to: name)
+                // Change the filter before reloading so renaming does not clear the selected paper.
+                if filter == "t:" + oldName { filter = "t:" + name }
+            } else if !tagRecords.contains(where: { $0.name == name }) {
+                try requireDatabase().upsertTag(LibraryTag(name: name, sortOrder: (tagRecords.map(\.sortOrder).max() ?? -1) + 1))
+            }
+            try reload(); status = oldName == nil ? "已新建标签" : "已重命名标签"; return true
+        } catch { self.error = error.localizedDescription; return false }
     }
 
     func tagColor(_ name: String) -> Color {
@@ -147,6 +174,38 @@ extension LibraryStore {
     @discardableResult func addToCollection(_ id: UUID, referenceIDs: Set<UUID>) -> Bool {
         let values = references.filter { referenceIDs.contains($0.id) && $0.deletedAt == nil && !$0.collectionIDs.contains(id) }.map { item in var value = item; value.collectionIDs.append(id); return value }
         return !values.isEmpty && saveBatch(values, action: "添加到文集")
+    }
+
+    @discardableResult func removeTag(_ name: String, from ids: Set<UUID>) -> Bool {
+        let values = references.filter { ids.contains($0.id) && $0.deletedAt == nil && $0.tags.contains(name) }.map { item in
+            var value = item; value.tags.removeAll { $0 == name }; return value
+        }
+        return !values.isEmpty && saveBatch(values, action: "移除标签")
+    }
+
+    @discardableResult func removeFromCollection(_ id: UUID, referenceIDs: Set<UUID>) -> Bool {
+        let values = references.filter { referenceIDs.contains($0.id) && $0.deletedAt == nil && $0.collectionIDs.contains(id) }.map { item in
+            var value = item
+            value.collectionIDs.removeAll { $0 == id }
+            // An empty ID list with the legacy name would be interpreted as an imported membership.
+            value.collection = ""
+            return value
+        }
+        return !values.isEmpty && saveBatch(values, action: "移出文集")
+    }
+
+    /// Resolve the current record at the moment of interaction, rather than saving a captured inspector snapshot.
+    @discardableResult func setTag(_ name: String, for referenceID: UUID, isMember: Bool) -> Bool {
+        guard let current = references.first(where: { $0.id == referenceID && $0.deletedAt == nil }) else { return false }
+        guard current.tags.contains(name) != isMember else { return true }
+        return isMember ? addTag(name, to: [referenceID]) : removeTag(name, from: [referenceID])
+    }
+
+    @discardableResult func setCollection(_ id: UUID, for referenceID: UUID, isMember: Bool) -> Bool {
+        guard collectionRecords.contains(where: { $0.id == id }),
+              let current = references.first(where: { $0.id == referenceID && $0.deletedAt == nil }) else { return false }
+        guard current.collectionIDs.contains(id) != isMember else { return true }
+        return isMember ? addToCollection(id, referenceIDs: [referenceID]) : removeFromCollection(id, referenceIDs: [referenceID])
     }
 
     func droppedReferenceIDs(_ payloads: [String]) -> Set<UUID> {

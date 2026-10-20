@@ -55,7 +55,7 @@ struct LibrarySettingsView: View {
                 HStack { Text("{{字段}}，{{#字段}}非空时显示{{/字段}}。支持嵌套条件。").font(.caption).foregroundStyle(.secondary); Spacer(); Button("恢复默认") { store.preferences.templates = .init() } }
             }.padding(22).tabItem { Label("模板", systemImage: "doc.badge.gearshape") }
             IntegrationSettingsView(store: store).tabItem { Label("集成", systemImage: "puzzlepiece.extension") }
-            LearningSettingsView(learning: store.learning).tabItem { Label("研读", systemImage: "sparkles") }
+            LearningSettingsView(learning: store.learning).tabItem { Label("AI 与研读", systemImage: "sparkles") }
         }.frame(minWidth: 720, idealWidth: 800, minHeight: 600, idealHeight: 680)
         .onChange(of: store.preferences) { _, _ in store.savePreferences() }
     }
