@@ -15,20 +15,7 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             LibrarySplitView(showingSidebar: $showingSidebar, showingInspector: $showingInspector) {
-                VStack(spacing: 0) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                        TextField("搜索全部文献", text: $store.search)
-                            .textFieldStyle(.plain).focused($searchFocused)
-                            .accessibilityIdentifier("library.search")
-                        if !store.search.isEmpty {
-                            Button { store.search = "" } label: { Image(systemName: "xmark.circle.fill") }
-                                .buttonStyle(.plain).foregroundStyle(.secondary).help("清除搜索")
-                        }
-                    }
-                    .padding(8).background(.quaternary, in: RoundedRectangle(cornerRadius: 8)).padding(10)
-                    SidebarView(store: store)
-                }
+                SidebarView(store: store)
             } content: {
                 Group {
                     if store.filtered.isEmpty {
@@ -82,9 +69,11 @@ struct ContentView: View {
         .navigationTitle(Text(LocalizedStringKey(store.heading)))
         .navigationSubtitle(Bundle.main.bundleIdentifier == "local.papershelf.qa" ? "测试文库" : "")
         .toolbar { libraryToolbar }
+        .searchable(text: $store.search, placement: .toolbar, prompt: "搜索全部文献")
+        .searchFocused($searchFocused)
+        .searchPresentationToolbarBehavior(.avoidHidingContent)
         .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfFocusSearch"))) { _ in
-            showingSidebar = true
-            DispatchQueue.main.async { searchFocused = true }
+            searchFocused = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfToggleSidebar"))) { _ in showingSidebar.toggle() }
         .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfToggleInspector"))) { _ in toggleInspector() }
