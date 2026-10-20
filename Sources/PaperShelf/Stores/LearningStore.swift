@@ -15,6 +15,8 @@ final class LearningStore: ObservableObject {
     @Published var answer = ""
     @Published private(set) var answerRunID: String?
     @Published var diagnostics = ""
+    @Published var providerConnectionStatus = ""
+    @Published var availableModels: [String] = []
     @Published var reviewRevision = 0
     private var client: PipelineProcess?
     private var operation: Task<Void, Never>?
@@ -30,6 +32,12 @@ final class LearningStore: ObservableObject {
         do {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             if FileManager.default.fileExists(atPath: config.path) { settings = try JSONDecoder().decode(LearningSettings.self, from: Data(contentsOf: config)) }
+            // Remember an existing shared connection before the user edits the
+            // main model. Malformed advanced JSON stays editable in settings.
+            if let graph = try? GraphConnectionSettings.synchronizingMainModel(in: settings.graphitiJSON,
+                endpoint: settings.baseURL, model: settings.model, apiKeyEnvironment: settings.apiKeyEnvironment) {
+                settings.graphitiJSON = graph
+            }
         } catch { configurationAvailable = false; self.error = "研读配置无法读取，未覆盖原文件：\(error.localizedDescription)" }
         do {
             let history = root.appendingPathComponent("history.json")
@@ -77,6 +85,8 @@ final class LearningStore: ObservableObject {
         do {
             guard configurationAvailable else { throw LearningError.message("原配置读取失败，请先在 Finder 中检查 settings.json。") }
             try ExtractionField.validate(settings.fields)
+            settings.graphitiJSON = try GraphConnectionSettings.synchronizingMainModel(in: settings.graphitiJSON,
+                endpoint: settings.baseURL, model: settings.model, apiKeyEnvironment: settings.apiKeyEnvironment)
             let graph = try object(settings.graphitiJSON)
             if graph["enabled"] as? Bool == true { try validateGraphCredentialDestination(settings, graph: graph) }
             _ = try object(settings.paper2agentJSON)
@@ -282,6 +292,7 @@ final class LearningStore: ObservableObject {
     func probeProvider(models: Bool = false) {
         guard !busy else { return }
         busy = true; error = nil
+        providerConnectionStatus = models ? "正在获取模型列表…" : "正在测试连接…"
         activeReferenceID = nil; activeOutput = nil
         var configuration = settings
         configuration.pythonPath = pythonPath; configuration.backendPath = backendPath
@@ -292,10 +303,17 @@ final class LearningStore: ObservableObject {
                 let config = work.appendingPathComponent("provider.json")
                 let value = try providerConfiguration(configuration)
                 try JSONSerialization.data(withJSONObject: value).write(to: config, options: .atomic)
-                diagnostics = prettyJSON(try await invoke([models ? "provider-models" : "provider-probe", "--config", config.path], work: work, configuration: configuration))
+                let result = try await invoke([models ? "provider-models" : "provider-probe", "--config", config.path], work: work, configuration: configuration)
+                diagnostics = prettyJSON(result)
+                if models {
+                    availableModels = (result["models"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+                    providerConnectionStatus = availableModels.isEmpty ? "服务未返回模型列表，可直接填写模型名称。" : "已获取 \(availableModels.count) 个模型，可在上方选择。"
+                } else {
+                    providerConnectionStatus = "连接成功 · \(configuration.model)"
+                }
                 progress = models ? "模型列表已读取。" : "模型连接测试已完成。"
-            } catch is CancellationError { progress = "测试已取消。" }
-            catch { self.error = error.localizedDescription }
+            } catch is CancellationError { progress = "测试已取消。"; providerConnectionStatus = "测试已取消。" }
+            catch { self.error = error.localizedDescription; providerConnectionStatus = "连接未成功，请检查地址、模型名称和 API Key。" }
         }
     }
 
@@ -464,7 +482,7 @@ final class LearningStore: ObservableObject {
             if let dict = value as? [String: Any] {
                 for (key, child) in dict {
                     if ["api_key", "apikey", "password", "secret", "access_token", "authorization"].contains(key.lowercased()) {
-                        throw LearningError.message("配置中不能填写原始密钥或密码（\(key)）；请使用钥匙串与 *_environment 字段。")
+                        throw LearningError.message("请将 \(key) 填入上方的 API Key 或密码输入框，再从高级 JSON 中移除此项。")
                     }
                     try validate(child)
                 }

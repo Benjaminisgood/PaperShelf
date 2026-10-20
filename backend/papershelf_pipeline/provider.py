@@ -81,7 +81,7 @@ class Provider:
                     result = json.load(response)
         except urllib.error.HTTPError as error:
             # Do not repeat server bodies: providers can echo submitted keys.
-            raise PipelineError(f"模型服务 HTTP {error.code}；请检查地址、模型和环境变量 {self.key_env}。") from error
+            raise PipelineError(f"模型服务 HTTP {error.code}；请检查 API 地址、模型名称和 API Key。") from error
         except (urllib.error.URLError, TimeoutError, OSError) as error:
             raise PipelineError(f"无法连接模型服务（{type(error).__name__}）；请检查服务可达性。") from error
         self.calls += 1

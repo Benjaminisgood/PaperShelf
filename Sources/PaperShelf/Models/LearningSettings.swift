@@ -1,7 +1,7 @@
 import Foundation
 import PaperCore
 
-struct LearningSettings: Codable {
+struct LearningSettings: Codable, Equatable {
     var pythonPath = ""
     var backendPath = ""
     var mode = "offline"

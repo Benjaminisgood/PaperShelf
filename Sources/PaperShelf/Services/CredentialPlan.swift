@@ -4,8 +4,9 @@ import Foundation
 /// service. The caller supplies the parser so unrelated commands never inspect
 /// an unfinished Graphiti configuration.
 struct CredentialPlan {
-    enum Secret: String, Equatable {
+    enum Secret: String, CaseIterable, Sendable {
         case provider = "api-key"
+        case graphProvider = "graph-api-key"
         case embedding = "embedding-key"
         case graphPassword = "graph-password"
     }
@@ -52,22 +53,32 @@ struct CredentialPlan {
         let passwordEnvironment = Self.environmentName(graph, key: "password_environment", fallback: backend == "neo4j" ? "NEO4J_PASSWORD" : nil)
         if requiresGraph {
             try add(passwordEnvironment, .graphPassword)
-            if requiresEmbedding, embeddingKey != providerKeyEnvironment { try add(embeddingKey, .embedding) }
+            if requiresGraphModel, graphKey != providerKeyEnvironment { try add(graphKey, .graphProvider) }
+            if requiresEmbedding, embeddingKey != providerKeyEnvironment {
+                try add(embeddingKey, embeddingKey == graphKey ? .graphProvider : .embedding)
+            }
         }
         lookups = requests
         var managed: [String: String] = ["backend": backend]
         if let uri = graph["uri"] as? String { managed["uri"] = uri }
+        if let user = graph["user"] as? String { managed["user"] = user }
         if let passwordEnvironment { managed["password_environment"] = passwordEnvironment }
         managedGraphConfiguration = managed
     }
 
-    /// Existing nonempty process credentials always win. This function never
-    /// returns or prints the inherited values; only new environment additions.
+    /// A value saved in settings wins over an inherited process credential.
+    /// Missing or unreadable saved values leave an existing inherited credential
+    /// untouched. A failed read still surfaces when there is no fallback. This
+    /// function never returns or prints the inherited values.
     func additions(inherited: [String: String], load: (Secret) throws -> String) throws -> [String: String] {
         var result: [String: String] = [:]
-        for lookup in lookups where inherited[lookup.environment]?.isEmpty != false {
-            let value = try load(lookup.secret)
-            if !value.isEmpty { result[lookup.environment] = value }
+        for lookup in lookups {
+            do {
+                let value = try load(lookup.secret)
+                if !value.isEmpty { result[lookup.environment] = value }
+            } catch {
+                guard inherited[lookup.environment]?.isEmpty == false else { throw error }
+            }
         }
         return result
     }

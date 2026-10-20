@@ -3,6 +3,8 @@ import PaperCore
 
 struct SidebarView: View {
     @ObservedObject var store: LibraryStore
+    @State private var collectionDraft: SidebarCollectionDraft?
+    @State private var tagDraft: SidebarTagDraft?
 
     var body: some View {
         List(selection: Binding<String?>(get: { store.filter }, set: { store.filter = $0 ?? "all" })) {
@@ -15,14 +17,20 @@ struct SidebarView: View {
                 row("收藏", icon: "star", filter: "favorites")
             }
             Section {
+                if let draft = collectionDraft {
+                    SidebarNameEditor(title: draft.collection == nil ? "新建文集" : "重命名文集", initialValue: draft.collection?.name ?? "", onSave: { name in
+                        guard store.saveCollection(name: name, collection: draft.collection, parentID: draft.parentID) != nil else { return takeError() }
+                        return nil
+                    }, onCancel: { collectionDraft = nil }).id(draft.id)
+                }
                 ForEach(store.sortedCollections(parent: nil)) { collection in
-                    CollectionSidebarRow(store: store, collection: collection)
+                    CollectionSidebarRow(store: store, collection: collection, edit: editCollection)
                 }
                 ForEach(store.collections, id: \.self) { name in row(name, icon: "folder", filter: "c:" + name) }
             } header: {
                 HStack {
                     Text("文集"); Spacer()
-                    Button { store.editCollection() } label: { Image(systemName: "plus") }.buttonStyle(.plain).help("新建文集")
+                    Button { editCollection(nil, nil) } label: { Image(systemName: "plus") }.buttonStyle(.plain).help("新建文集").accessibilityLabel("新建文集")
                 }
                 .contentShape(Rectangle())
                 .dropDestination(for: String.self) { payloads, _ in
@@ -34,16 +42,30 @@ struct SidebarView: View {
                 .help("将文集拖到此处可移到顶层")
             }
             Section {
-                ForEach(store.tags, id: \.self) { name in TagSidebarRow(store: store, name: name) }
+                if let draft = tagDraft {
+                    SidebarNameEditor(title: draft.name == nil ? "新建标签" : "重命名标签", initialValue: draft.name ?? "", onSave: { name in
+                        guard store.saveTag(name: name, renaming: draft.name) else { return takeError() }
+                        return nil
+                    }, onCancel: { tagDraft = nil }).id(draft.id)
+                }
+                ForEach(store.tags, id: \.self) { name in TagSidebarRow(store: store, name: name, rename: { tagDraft = SidebarTagDraft(name: name) }) }
             } header: {
                 HStack {
                     Text("标签"); Spacer()
-                    Button { store.addTag() } label: { Image(systemName: "plus") }.buttonStyle(.plain).help("新建标签")
+                    Button { tagDraft = SidebarTagDraft(); collectionDraft = nil } label: { Image(systemName: "plus") }.buttonStyle(.plain).help("新建标签").accessibilityLabel("新建标签")
                 }
             }
             Section { row("最近删除", icon: "trash", filter: "trash") }
         }
         .listStyle(.sidebar)
+        .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfCreateCollection"))) { _ in editCollection(nil, nil) }
+    }
+
+    private func editCollection(_ collection: LibraryCollection?, _ parentID: UUID?) {
+        tagDraft = nil; collectionDraft = SidebarCollectionDraft(collection: collection, parentID: parentID)
+    }
+    private func takeError() -> String {
+        let message = store.error ?? "保存失败"; store.error = nil; return message
     }
 
     private func row(_ title: String, icon: String, filter: String) -> some View {
@@ -77,6 +99,7 @@ private struct SidebarIcon: View {
 private struct TagSidebarRow: View {
     @ObservedObject var store: LibraryStore
     let name: String
+    let rename: () -> Void
     @State private var isTargeted = false
 
     var body: some View {
@@ -98,7 +121,8 @@ private struct TagSidebarRow: View {
         .help("拖入文献可批量添加标签；拖入其他标签可调整顺序")
         .contextMenu {
             Button("添加到选中文献") { store.addTag(name, to: store.selectedIDs) }.disabled(store.selectedReferences.allSatisfy { $0.deletedAt != nil })
-            Button("重命名") { store.renameTag(name) }
+            Button("从选中文献取消标签") { store.removeTag(name, from: store.selectedIDs) }.disabled(!store.selectedReferences.contains { $0.deletedAt == nil && $0.tags.contains(name) })
+            Button("重命名") { rename() }
             Menu("颜色") {
                 ForEach([("蓝色", "#007AFF"), ("绿色", "#34C759"), ("橙色", "#FF9500"), ("红色", "#FF3B30"), ("紫色", "#AF52DE")], id: \.1) { color in
                     Button(color.0) { store.colorTag(name, hex: color.1) }
@@ -119,6 +143,7 @@ private struct TagSidebarRow: View {
 private struct CollectionSidebarRow: View {
     @ObservedObject var store: LibraryStore
     let collection: LibraryCollection
+    let edit: (LibraryCollection?, UUID?) -> Void
     @State private var isExpanded = false
     @State private var isTargeted = false
     @State private var rowHeight: CGFloat = 24
@@ -128,15 +153,16 @@ private struct CollectionSidebarRow: View {
             if children.isEmpty { label }
             else {
                 DisclosureGroup(isExpanded: $isExpanded) {
-                    ForEach(children) { CollectionSidebarRow(store: store, collection: $0) }
+                    ForEach(children) { CollectionSidebarRow(store: store, collection: $0, edit: edit) }
                 } label: { label }
             }
         }
         .tag("c:\(collection.id)")
         .contextMenu {
             Button("添加选中文献") { store.addToCollection(collection.id, referenceIDs: store.selectedIDs) }.disabled(store.selectedReferences.allSatisfy { $0.deletedAt != nil })
-            Button("新建子文集") { store.editCollection(parentID: collection.id); isExpanded = true }
-            Button("重命名") { store.editCollection(collection) }
+            Button("从选中文献移出文集") { store.removeFromCollection(collection.id, referenceIDs: store.selectedIDs) }.disabled(!store.selectedReferences.contains { $0.deletedAt == nil && $0.collectionIDs.contains(collection.id) })
+            Button("新建子文集") { edit(nil, collection.id); isExpanded = true }
+            Button("重命名") { edit(collection, collection.parentID) }
             Toggle("包含子文集文献", isOn: Binding(get: { store.preferences.includeSubcollections }, set: { _ in store.toggleSubcollections() }))
             Divider()
             Button("上移") { store.shiftCollection(collection, offset: -1) }.disabled(siblings.first?.id == collection.id)
@@ -178,5 +204,51 @@ private struct CollectionSidebarRow: View {
             return store.addToCollection(collection.id, referenceIDs: store.droppedReferenceIDs(payloads))
         } isTargeted: { isTargeted = $0 }
         .help("拖入文献可添加归属；文集拖到行中央成为子文集，拖到上沿或下沿可排序")
+    }
+}
+
+private struct SidebarCollectionDraft: Identifiable {
+    let id = UUID()
+    var collection: LibraryCollection?
+    var parentID: UUID?
+}
+
+private struct SidebarTagDraft: Identifiable {
+    let id = UUID()
+    var name: String?
+}
+
+private struct SidebarNameEditor: View {
+    let title: String
+    let onSave: (String) -> String?
+    let onCancel: () -> Void
+    @State private var name: String
+    @State private var error: String?
+    @FocusState private var focused: Bool
+
+    init(title: String, initialValue: String, onSave: @escaping (String) -> String?, onCancel: @escaping () -> Void) {
+        self.title = title; self.onSave = onSave; self.onCancel = onCancel
+        _name = State(initialValue: initialValue)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(LocalizedStringKey(title)).font(.caption).foregroundStyle(.secondary)
+            TextField("名称", text: $name).textFieldStyle(.roundedBorder).focused($focused)
+                .accessibilityLabel(LocalizedStringKey(title)).onSubmit(save).onExitCommand(perform: onCancel)
+            HStack {
+                Button("取消", action: onCancel)
+                Spacer(minLength: 0)
+                Button("保存", action: save).disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }.buttonStyle(.borderless).controlSize(.small)
+            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+        }.padding(.vertical, 6).task { focused = true }
+    }
+
+    private func save() {
+        let value = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        error = onSave(value)
+        if error == nil { onCancel() }
     }
 }

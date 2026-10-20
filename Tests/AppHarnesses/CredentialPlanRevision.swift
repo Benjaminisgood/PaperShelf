@@ -8,8 +8,10 @@ import Foundation
         }
         precondition(plan.lookups == [.init(environment: "TEST_READING_KEY", secret: .provider)])
         var reads = 0
-        let additions = try plan.additions(inherited: ["TEST_READING_KEY": "fixture-only"]) { _ in reads += 1; return "" }
-        precondition(additions.isEmpty && reads == 0)
-        print("Editorial revision requests only the selected provider credential; inherited values remain untouched.")
+        let additions = try plan.additions(inherited: ["TEST_READING_KEY": "fixture-only"]) { _ in reads += 1; return "fixture-saved" }
+        precondition(additions == ["TEST_READING_KEY": "fixture-saved"] && reads == 1)
+        let fallback = try plan.additions(inherited: ["TEST_READING_KEY": "fixture-only"]) { _ in "" }
+        precondition(fallback.isEmpty)
+        print("Editorial revision requests only the selected provider credential; saved values win and missing saved values retain inherited credentials.")
     }
 }

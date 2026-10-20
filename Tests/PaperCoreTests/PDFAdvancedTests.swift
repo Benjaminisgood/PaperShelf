@@ -27,6 +27,98 @@ final class PDFAdvancedTests: XCTestCase {
         return url
     }
 
+    private func makeAnnotationPDF(colorEntries: [String]) throws -> URL {
+        // Write the actual PDF dictionaries: saving through PDFKit can normalize
+        // missing color entries and hide the parser behavior under test.
+        let annotationReferences = colorEntries.indices.map { "\($0 + 4) 0 R" }.joined(separator: " ")
+        var objects = [
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Annots [\(annotationReferences)] >>"
+        ]
+        objects += colorEntries.enumerated().map { index, entry in
+            "<< /Type /Annot /Subtype /FreeText /Rect [50 50 150 75] /DA (/Helvetica 12 Tf 0 g) /Contents (color-\(index)) \(entry) >>"
+        }
+        var data = Data("%PDF-1.7\n".utf8)
+        var offsets: [Int] = []
+        for (index, object) in objects.enumerated() {
+            offsets.append(data.count)
+            data.append(Data("\(index + 1) 0 obj\n\(object)\nendobj\n".utf8))
+        }
+        let xrefOffset = data.count
+        data.append(Data("xref\n0 \(objects.count + 1)\n0000000000 65535 f \n".utf8))
+        for offset in offsets {
+            data.append(Data(String(format: "%010d 00000 n \n", offset).utf8))
+        }
+        data.append(Data("trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xrefOffset)\n%%EOF\n".utf8))
+        let url = directory.appendingPathComponent("annotation-colors.pdf")
+        try data.write(to: url)
+        return url
+    }
+
+    func testFreeTextWithoutColorExtractsAsTransparentBlackWithoutMutatingPDF() throws {
+        let url = try makeAnnotationPDF(colorEntries: [""])
+        let before = try Data(contentsOf: url)
+        let stored = try XCTUnwrap(PDFDocument(url: url)?.page(at: 0)?.annotations.first)
+        XCTAssertEqual(stored.type, "FreeText")
+        XCTAssertNil(stored.color.usingColorSpace(.sRGB), "Exercise PDFKit's empty color for a FreeText annotation without /C")
+        XCTAssertEqual(stored.color.alphaComponent, 0)
+
+        let reference = try PDFLinks.reference(from: url)
+        let annotations = try PDFLinks.annotations(for: reference)
+        XCTAssertEqual(annotations.count, 1)
+        let annotation = try XCTUnwrap(annotations.first)
+        XCTAssertEqual(annotation.comment, "color-0")
+        XCTAssertEqual(annotation.kind, "FreeText")
+        XCTAssertEqual(annotation.colorHex, "#000000")
+        XCTAssertEqual(annotation.opacity, 0)
+        XCTAssertEqual(try Data(contentsOf: url), before)
+    }
+
+    func testParsedGrayRGBAndCMYKColorsAndTransparencyArePreserved() throws {
+        let url = try makeAnnotationPDF(colorEntries: ["/C [0.5]", "/C [0.2 0.6 0.8]", "/C [0 1 1 0]", "/C []"])
+        let before = try Data(contentsOf: url)
+        let page = try XCTUnwrap(PDFDocument(url: url)?.page(at: 0))
+        XCTAssertEqual(page.annotations.count, 4)
+        XCTAssertEqual(page.annotations.map { $0.color.colorSpace.colorSpaceModel }, [.gray, .rgb, .cmyk, .gray])
+        let cmykRGB = try XCTUnwrap(page.annotations[2].color.usingColorSpace(.sRGB))
+
+        let annotations = try PDFLinks.annotations(for: PDFLinks.reference(from: url))
+        XCTAssertEqual(annotations.count, 4)
+        XCTAssertEqual(annotations.map(\.comment), ["color-0", "color-1", "color-2", "color-3"])
+        XCTAssertEqual(annotations.map(\.colorHex).prefix(2), ["#808080", "#3399CC"])
+        // Device CMYK conversion uses the system profile; compare channels to
+        // the parsed color instead of hard-coding a profile-dependent RGB hex.
+        let cmykHex = try XCTUnwrap(annotations.first { $0.comment == "color-2" }?.colorHex)
+        let packedRGB = try XCTUnwrap(UInt32(cmykHex.dropFirst(), radix: 16))
+        XCTAssertEqual(Double((packedRGB >> 16) & 255) / 255, Double(cmykRGB.redComponent), accuracy: 1 / 255)
+        XCTAssertEqual(Double((packedRGB >> 8) & 255) / 255, Double(cmykRGB.greenComponent), accuracy: 1 / 255)
+        XCTAssertEqual(Double(packedRGB & 255) / 255, Double(cmykRGB.blueComponent), accuracy: 1 / 255)
+        XCTAssertEqual(annotations.last?.colorHex, "#000000")
+        XCTAssertEqual(annotations.map(\.opacity), [1, 1, 1, 0])
+        XCTAssertEqual(try Data(contentsOf: url), before)
+    }
+
+    func testBookmarkedPDFStillExtractsAnnotationsAfterRename() throws {
+        let originalURL = try makeAnnotationPDF(colorEntries: ["/C [0.2 0.6 0.8]"])
+        let before = try Data(contentsOf: originalURL)
+        let reference = try PDFLinks.reference(from: originalURL)
+        let database = try LibraryDatabase(url: directory.appendingPathComponent("library.sqlite"))
+        try database.upsert(reference)
+        let renamedURL = directory.appendingPathComponent("renamed-document.pdf")
+        try FileManager.default.moveItem(at: originalURL, to: renamedURL)
+
+        let restored = try XCTUnwrap(database.load().first)
+        XCTAssertEqual(restored.pdfPath, originalURL.path, "Keep the original stored path so this exercises bookmark resolution")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertEqual(try PDFLinks.resolvedURL(for: restored).resolvingSymlinksInPath(), renamedURL.resolvingSymlinksInPath())
+        let annotations = try PDFLinks.annotations(for: restored)
+        XCTAssertEqual(annotations.count, 1)
+        XCTAssertEqual(annotations.first?.comment, "color-0")
+        XCTAssertEqual(annotations.first?.colorHex, "#3399CC")
+        XCTAssertEqual(try Data(contentsOf: renamedURL), before)
+    }
+
     func testDisjointQuadrilateralsExcludeInterveningTextAndKeepColor() throws {
         let url = try makePDF { context in
             draw("FIRST selected", in: context, at: CGPoint(x: 50, y: 720))

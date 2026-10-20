@@ -144,7 +144,13 @@ public enum PDFLinks {
                         }
                         if !selected.isEmpty { source = "ocr" }
                     }
-                    let color = annotation.color.usingColorSpace(.sRGB) ?? .black
+                    // A FreeText annotation without /C can have an empty color
+                    // that cannot convert to sRGB. NSColor.black is gray, and
+                    // reading its RGB components raises an Objective-C exception.
+                    // Use an explicit RGB fallback and keep the original opacity.
+                    let originalColor = annotation.color
+                    let color = originalColor.usingColorSpace(.sRGB)
+                        ?? NSColor(srgbRed: 0, green: 0, blue: 0, alpha: originalColor.alphaComponent)
                     let hex = String(format: "#%02X%02X%02X", Int((color.redComponent * 255).rounded()), Int((color.greenComponent * 255).rounded()), Int((color.blueComponent * 255).rounded()))
                     let png = isShape && options.includeRegionImages ? image.flatMap { NSBitmapImageRep(cgImage: $0).representation(using: .png, properties: [:]) } : nil
                     result.append(PaperAnnotation(id: "\(index)-\(offset)", page: index + 1, kind: kind,

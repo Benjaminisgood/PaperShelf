@@ -20,6 +20,7 @@ final class LibraryStore: ObservableObject {
     @Published var sortOrder = [KeyPathComparator(\Reference.addedAt, order: .reverse)]
     @Published var previewURL: URL?
     @Published var editingReference: Reference?
+    @Published var metadataRefreshBase: Reference?
     @Published var showingIdentifier = false
     @Published var showingBatchEditor = false
     @Published var fileProgress: LibraryFileProgress?
@@ -286,6 +287,7 @@ final class LibraryStore: ObservableObject {
             updated.doi = fetched.doi; updated.url = fetched.url
             if !fetched.abstract.isEmpty { updated.abstract = fetched.abstract }
             for key in [\Reference.volume, \.issue, \.pages, \.publisher, \.isbn, \.issn] { if !fetched[keyPath: key].isEmpty { updated[keyPath: key] = fetched[keyPath: key] } }
+            metadataRefreshBase = reference
             editingReference = updated; status = "已取得元数据，请核对后保存"
         } catch { self.error = error.localizedDescription }
     }

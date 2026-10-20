@@ -9,15 +9,18 @@ struct ContentView: View {
     @AppStorage("library.showStatusBar") private var showStatusBar = true
     @FocusState private var searchFocused: Bool
     @State private var confirmingPurge = false
+    @State private var inspectedReferenceID: UUID?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @SceneStorage("library.inspector.tab") private var inspectorTab = 0
     var body: some View {
         VStack(spacing: 0) {
-            NavigationSplitView {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
                 SidebarView(store: store).navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 320)
             } detail: {
                 Group {
                     if store.filtered.isEmpty {
                         ContentUnavailableView {
-                            Label(store.search.isEmpty ? "还没有文献" : "没有匹配的文献", systemImage: "books.vertical")
+                            Label(store.search.isEmpty && store.filter == "all" ? "还没有文献" : "没有匹配的文献", systemImage: "books.vertical")
                         } description: { Text("拖入 PDF、BibTeX 或 RIS，也可以通过标识符或浏览器采集。") }
                         actions: { Button("导入文献…") { store.importFiles() } }
                     } else { LibraryTable(store: store) }
@@ -40,8 +43,21 @@ struct ContentView: View {
             // source list redistributes one layout rather than a nested split.
             .inspector(isPresented: $showingInspector) {
                 Group {
-                    if let item = store.selected {
-                        ReferenceDetail(store: store, reference: item).id(item.id)
+                    if let item = inspectedReference {
+                        VStack(spacing: 0) {
+                            if !store.filtered.contains(where: { $0.id == item.id }) {
+                                HStack {
+                                    Text("此文献已不在当前筛选中，可继续编辑。")
+                                    Spacer(minLength: 4)
+                                    Button("显示文献") {
+                                        store.filter = "all"; store.search = ""; store.selectedID = item.id
+                                    }.buttonStyle(.borderless)
+                                }.font(.caption).foregroundStyle(.secondary).padding(12)
+                                Divider()
+                            }
+                            ReferenceDetail(store: store, reference: item, metadataDraft: store.editingReference?.id == item.id ? store.editingReference : nil)
+                                .id(item.id)
+                        }
                     } else {
                         ContentUnavailableView("选择文献", systemImage: "doc.text.magnifyingglass", description: Text("元数据、标注与研读资料将在这里显示。"))
                     }
@@ -71,23 +87,25 @@ struct ContentView: View {
         .quickLookPreview($store.previewURL)
         .sheet(isPresented: $store.showingIdentifier) { DOIImportView(store: store) }
         .sheet(isPresented: $store.showingBatchEditor) { BatchEditView(store: store) }
-        .sheet(item: $store.editingReference) { item in
-            MetadataEditor(reference: item, collections: store.collectionRecords) { updated in
-                guard let current = store.references.first(where: { $0.id == item.id }), current.deletedAt == item.deletedAt else { return "文献在编辑期间已被移除或恢复，请重新打开编辑器。" }
-                do {
-                    let merged = try ReferenceEdits.merge(base: item, edited: updated, current: current)
-                    if store.save(merged) { return nil }
-                    let message = store.error ?? "保存失败"; store.error = nil; return message
-                } catch { return error.localizedDescription }
-            }
-        }
         .alert("操作未完成", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) { Button("好") { store.error = nil } } message: { Text(store.error ?? "") }
         .confirmationDialog("永久删除选中记录？原始文件不会删除，此操作不能撤销。", isPresented: $confirmingPurge, titleVisibility: .visible) {
             Button("永久删除记录", role: .destructive) { store.permanentlyDeleteSelected() }
         }
-        .onAppear { store.undoManager = undoManager }
-        .onChange(of: store.filter) { _, _ in clearHiddenSelection() }
-        .onChange(of: store.search) { _, query in if !query.isEmpty && store.filter != "trash" { store.filter = "all" }; clearHiddenSelection() }
+        .onAppear { store.undoManager = undoManager; inspectedReferenceID = store.selectedID }
+        .onChange(of: store.selectedID) { _, id in
+            if let id { inspectedReferenceID = id }
+            else if let prior = inspectedReferenceID, store.filtered.contains(where: { $0.id == prior }) { inspectedReferenceID = nil }
+        }
+        .onChange(of: store.filter) { _, _ in clearHiddenSelection(); inspectedReferenceID = store.selectedID }
+        .onChange(of: store.search) { _, query in if !query.isEmpty && store.filter != "trash" { store.filter = "all" }; clearHiddenSelection(); inspectedReferenceID = store.selectedID }
+        .onChange(of: store.editingReference) { previous, draft in
+            guard let draft, let current = store.references.first(where: { $0.id == draft.id }) else { return }
+            if previous?.id != draft.id || draft == current {
+                store.selectedID = draft.id; inspectedReferenceID = draft.id; showingInspector = true; inspectorTab = 0
+            }
+            if draft == current { store.editingReference = nil; store.metadataRefreshBase = nil }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfCreateCollection"))) { _ in columnVisibility = .all }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in try? store.reload() }
     }
     @ToolbarContentBuilder private var libraryToolbar: some ToolbarContent {
@@ -97,7 +115,7 @@ struct ContentView: View {
                 Button("通过 DOI / ISBN / arXiv 添加…", systemImage: "link.badge.plus") { store.showingIdentifier = true }
                 Button("手动添加…", systemImage: "doc.badge.plus") { store.addManual() }
                 Divider()
-                Button("新建文集…", systemImage: "folder.badge.plus") { store.editCollection() }
+                Button("新建文集", systemImage: "folder.badge.plus") { NotificationCenter.default.post(name: .init("PaperShelfCreateCollection"), object: nil) }
                 Button("从 Zotero 迁移…") { store.importZotero() }
             } label: { Label("添加", systemImage: "plus") }.help("导入或添加文献")
             Menu {
@@ -129,4 +147,9 @@ struct ContentView: View {
     }
 
     private func clearHiddenSelection() { store.selectedIDs.formIntersection(Set(store.filtered.map(\.id))) }
+    private var inspectedReference: Reference? {
+        if let selected = store.selected { return selected }
+        guard let id = inspectedReferenceID else { return nil }
+        return store.references.first { $0.id == id && $0.deletedAt == nil }
+    }
 }
