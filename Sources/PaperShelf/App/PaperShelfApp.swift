@@ -27,6 +27,12 @@ struct PaperShelfApp: App {
                 Button("新建文集") { NotificationCenter.default.post(name: .init("PaperShelfCreateCollection"), object: nil) }.keyboardShortcut("n", modifiers: [.command, .shift])
             }
             CommandGroup(after: .textEditing) { Button("搜索全部文献") { NotificationCenter.default.post(name: .init("PaperShelfFocusSearch"), object: nil) }.keyboardShortcut("f") }
+            CommandGroup(after: .sidebar) {
+                Button("切换边栏") { NotificationCenter.default.post(name: .init("PaperShelfToggleSidebar"), object: nil) }
+                    .keyboardShortcut("s", modifiers: [.command, .option])
+                Button("切换检查器") { NotificationCenter.default.post(name: .init("PaperShelfToggleInspector"), object: nil) }
+                    .keyboardShortcut("i", modifiers: [.command, .option])
+            }
             CommandMenu("文献") {
                 Button("打开 PDF") { if let item = store.selected { store.openPDF(item) } }.keyboardShortcut("o").disabled(store.selected?.pdfPath == nil)
                 Button("快速查看") { store.preview() }.keyboardShortcut("y").disabled(store.selected?.pdfPath == nil)

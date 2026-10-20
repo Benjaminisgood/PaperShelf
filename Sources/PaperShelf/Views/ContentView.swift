@@ -10,13 +10,26 @@ struct ContentView: View {
     @FocusState private var searchFocused: Bool
     @State private var confirmingPurge = false
     @State private var inspectedReferenceID: UUID?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @SceneStorage("library.sidebar") private var showingSidebar = true
     @SceneStorage("library.inspector.tab") private var inspectorTab = 0
     var body: some View {
         VStack(spacing: 0) {
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                SidebarView(store: store).navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 320)
-            } detail: {
+            LibrarySplitView(showingSidebar: $showingSidebar, showingInspector: $showingInspector) {
+                VStack(spacing: 0) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField("搜索全部文献", text: $store.search)
+                            .textFieldStyle(.plain).focused($searchFocused)
+                            .accessibilityIdentifier("library.search")
+                        if !store.search.isEmpty {
+                            Button { store.search = "" } label: { Image(systemName: "xmark.circle.fill") }
+                                .buttonStyle(.plain).foregroundStyle(.secondary).help("清除搜索")
+                        }
+                    }
+                    .padding(8).background(.quaternary, in: RoundedRectangle(cornerRadius: 8)).padding(10)
+                    SidebarView(store: store)
+                }
+            } content: {
                 Group {
                     if store.filtered.isEmpty {
                         ContentUnavailableView {
@@ -25,23 +38,9 @@ struct ContentView: View {
                         actions: { Button("导入文献…") { store.importFiles() } }
                     } else { LibraryTable(store: store) }
                 }
-                // Table columns may scroll; they must not set the window's
-                // minimum width when both sidebars are visible.
                 .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle(Text(LocalizedStringKey(store.heading)))
-                .navigationSubtitle(Bundle.main.bundleIdentifier == "local.papershelf.qa" ? "测试文库" : "")
-                .dropDestination(for: URL.self) { urls, _ in
-                    let files = urls.filter(\.isFileURL); guard !files.isEmpty else { return false }
-                    store.importURLs(files); return true
-                }
-            }
-            .navigationSplitViewStyle(.balanced)
-            .searchable(text: $store.search, placement: .sidebar, prompt: "搜索全部文献")
-            .searchFocused($searchFocused)
-            .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfFocusSearch"))) { _ in searchFocused = true }
-            // The inspector belongs to the full split view, so opening the
-            // source list redistributes one layout rather than a nested split.
-            .inspector(isPresented: $showingInspector) {
+                .dropDestination(for: URL.self) { urls, _ in return importFiles(urls) }
+            } inspector: {
                 Group {
                     if let item = inspectedReference {
                         VStack(spacing: 0) {
@@ -55,18 +54,15 @@ struct ContentView: View {
                                 }.font(.caption).foregroundStyle(.secondary).padding(12)
                                 Divider()
                             }
-                            ReferenceDetail(store: store, reference: item, metadataDraft: store.editingReference?.id == item.id ? store.editingReference : nil)
+                            ReferenceDetail(store: store, reference: item, metadataDraft: store.editingReference?.id == item.id ? store.editingReference : nil, tab: $inspectorTab, isVisible: showingInspector)
                                 .id(item.id)
                         }
                     } else {
                         ContentUnavailableView("选择文献", systemImage: "doc.text.magnifyingglass", description: Text("元数据、标注与研读资料将在这里显示。"))
                     }
                 }
-                .inspectorColumnWidth(min: 330, ideal: 390, max: 620)
-                .dropDestination(for: URL.self) { urls, _ in
-                    let files = urls.filter(\.isFileURL); guard !files.isEmpty else { return false }
-                    store.importURLs(files); return true
-                }
+                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
+                .dropDestination(for: URL.self) { urls, _ in return importFiles(urls) }
             }
             if showStatusBar {
                 Divider()
@@ -83,7 +79,15 @@ struct ContentView: View {
                 }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 14).padding(.vertical, 6)
             }
         }
+        .navigationTitle(Text(LocalizedStringKey(store.heading)))
+        .navigationSubtitle(Bundle.main.bundleIdentifier == "local.papershelf.qa" ? "测试文库" : "")
         .toolbar { libraryToolbar }
+        .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfFocusSearch"))) { _ in
+            showingSidebar = true
+            DispatchQueue.main.async { searchFocused = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfToggleSidebar"))) { _ in showingSidebar.toggle() }
+        .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfToggleInspector"))) { _ in toggleInspector() }
         .quickLookPreview($store.previewURL)
         .sheet(isPresented: $store.showingIdentifier) { DOIImportView(store: store) }
         .sheet(isPresented: $store.showingBatchEditor) { BatchEditView(store: store) }
@@ -105,10 +109,16 @@ struct ContentView: View {
             }
             if draft == current { store.editingReference = nil; store.metadataRefreshBase = nil }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfCreateCollection"))) { _ in columnVisibility = .all }
+        .onReceive(NotificationCenter.default.publisher(for: .init("PaperShelfCreateCollection"))) { _ in showingSidebar = true }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in try? store.reload() }
     }
     @ToolbarContentBuilder private var libraryToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Button { showingSidebar.toggle() } label: { Label("边栏", systemImage: "sidebar.left") }
+                .help(showingSidebar ? "隐藏边栏" : "显示边栏")
+                .accessibilityLabel(showingSidebar ? "隐藏边栏" : "显示边栏")
+                .accessibilityIdentifier("library.toggleSidebar")
+        }
         ToolbarItemGroup(placement: .primaryAction) {
             Menu {
                 Button("导入文件…", systemImage: "square.and.arrow.down") { store.importFiles() }
@@ -133,7 +143,10 @@ struct ContentView: View {
         }
         ToolbarSpacer(.fixed, placement: .primaryAction)
         ToolbarItem(placement: .primaryAction) {
-            Button { showingInspector.toggle() } label: { Label("检查器", systemImage: "sidebar.right") }.help(showingInspector ? "隐藏检查器" : "显示检查器")
+            Button(action: toggleInspector) { Label("检查器", systemImage: "sidebar.right") }
+                .help(showingInspector ? "隐藏检查器" : "显示检查器")
+                .accessibilityLabel(showingInspector ? "隐藏检查器" : "显示检查器")
+                .accessibilityIdentifier("library.toggleInspector")
         }
         if store.selectedIDs.count > 1 {
             ToolbarItem(placement: .secondaryAction) { Button("批量编辑", systemImage: "square.and.pencil") { store.showingBatchEditor = true } }
@@ -146,6 +159,16 @@ struct ContentView: View {
         }
     }
 
+    private func toggleInspector() {
+        if showingInspector && !InlineReferenceEditing.commit() { return }
+        showingInspector.toggle()
+    }
+    private func importFiles(_ urls: [URL]) -> Bool {
+        let files = urls.filter(\.isFileURL)
+        guard !files.isEmpty else { return false }
+        store.importURLs(files)
+        return true
+    }
     private func clearHiddenSelection() { store.selectedIDs.formIntersection(Set(store.filtered.map(\.id))) }
     private var inspectedReference: Reference? {
         if let selected = store.selected { return selected }

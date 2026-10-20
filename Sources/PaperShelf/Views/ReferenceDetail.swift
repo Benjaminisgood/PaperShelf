@@ -6,7 +6,8 @@ struct ReferenceDetail: View {
     @ObservedObject var store: LibraryStore
     let reference: Reference
     var metadataDraft: Reference? = nil
-    @SceneStorage("library.inspector.tab") private var tab = 0
+    @Binding var tab: Int
+    var isVisible = true
     @State private var annotations: [PaperAnnotation] = []
     @State private var annotationStatus = ""
     @State private var reading = false
@@ -145,13 +146,13 @@ struct ReferenceDetail: View {
                 let text = try PaperTemplateRenderer.render(reference: reference, annotations: annotations, templates: .init(metadata: "{{annotations}}", annotation: store.preferences.templates.annotation), imageLinks: links)
                 NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
             } catch { annotationStatus = error.localizedDescription } } }
-        }.task { if annotations.isEmpty && reference.pdfPath != nil { readAnnotations() } }
+        }.task(id: isVisible) { if reference.pdfPath != nil { readAnnotations() } }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in if tab == 1 && reference.pdfPath != nil { readAnnotations() } }
         .onChange(of: store.previewURL) { _, _ in if tab == 1 && reference.pdfPath != nil { readAnnotations() } }
         .onChange(of: reference.pdfPath) { _, _ in annotations = []; if reference.pdfPath != nil { readAnnotations() } }
     }
     private func readAnnotations() {
-        guard !reading else { return }
+        guard isVisible, tab == 1, !reading else { return }
         reading = true; let item = reference; let options = PDFAnnotationOptions(ocrIfNeeded: store.preferences.annotationOCR)
         Task { do { annotations = try await Task.detached { try PDFLinks.annotations(for: item, options: options) }.value; annotationStatus = "\(annotations.count) 条标注" }
             catch { annotationStatus = error.localizedDescription }; reading = false }

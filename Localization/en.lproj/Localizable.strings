@@ -444,3 +444,19 @@
 "硕士论文" = "Master’s thesis";
 "技术报告" = "Technical report";
 "手稿" = "Manuscript";
+
+"边栏" = "Sidebar";
+
+"隐藏边栏" = "Hide Sidebar";
+
+"显示边栏" = "Show Sidebar";
+
+"隐藏检查器" = "Hide Inspector";
+
+"显示检查器" = "Show Inspector";
+
+"切换边栏" = "Toggle Sidebar";
+
+"切换检查器" = "Toggle Inspector";
+
+"清除搜索" = "Clear Search";
