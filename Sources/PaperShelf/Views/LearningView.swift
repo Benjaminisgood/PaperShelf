@@ -28,11 +28,6 @@ struct LearningView: View {
             generationMode
             if learning.busy || (showsOperation && learning.error != nil) { operationStatus }
             VStack(alignment: .leading, spacing: 9) {
-                HStack {
-                    Text("生成与阅读").font(.headline)
-                    Spacer()
-                    Text("按需生成 · 版本保留").font(.caption2).foregroundStyle(.secondary)
-                }
                 ForEach(outputs) { output in outputRow(output) }
             }
             if let agentRun = latestRun(for: .agent) { agentSection(agentRun) }
@@ -50,13 +45,12 @@ struct LearningView: View {
 
     private var overview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("文献研读", systemImage: "book.closed").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                Spacer()
+            HStack(alignment: .top) {
+                Text(reference.title.isEmpty ? "未命名文献" : reference.title)
+                    .font(.headline).lineLimit(3).textSelection(.enabled).help(reference.title)
+                Spacer(minLength: 8)
                 SettingsLink { Image(systemName: "gearshape") }.buttonStyle(.plain).help("模型、字段与集成设置")
             }
-            Text(reference.title.isEmpty ? "未命名文献" : reference.title)
-                .font(.headline).lineLimit(3).textSelection(.enabled).help(reference.title)
             if !reference.authors.isEmpty || !reference.year.isEmpty {
                 Text(([reference.authors.prefix(2).joined(separator: "、"), reference.year].filter { !$0.isEmpty }).joined(separator: " · "))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -64,7 +58,7 @@ struct LearningView: View {
             if !hasSource {
                 HStack(alignment: .top, spacing: 7) {
                     Image(systemName: "doc.badge.plus")
-                    Text("先选择源文档，再生成需要的成果。")
+                    Text("请选择源文档")
                     Spacer(minLength: 0)
                     Button("选择…") { chooseSource() }.controlSize(.small)
                 }.font(.caption).foregroundStyle(.secondary)
@@ -80,12 +74,9 @@ struct LearningView: View {
             }.pickerStyle(.segmented).labelsHidden().disabled(learning.busy)
                 .onChange(of: learning.settings.mode) { _, _ in learning.saveSettings() }
             if learning.settings.mode == "llm" {
-                Text("AI 精读将全文发送至 \(learning.settings.model) 模型服务；全文 Markdown 与 Agent 创建在本机完成。")
+                Text("全文将发送至 \(learning.settings.model)")
                     .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    .help(learning.settings.baseURL)
-            } else {
-                Text("保留全文与出处，生成便于编辑的草稿。")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .help("模型服务：\(learning.settings.baseURL)\n全文 Markdown 与 Agent 创建在本机完成。")
             }
         }
     }
@@ -175,8 +166,6 @@ struct LearningView: View {
                         }
                     }.padding(.top, 8)
                 }
-                Text("生成结果另存为新版本，原始文献与已有资料保留。")
-                    .font(.caption2).foregroundStyle(.secondary)
             }.padding(.top, 10).disabled(learning.busy)
         }.font(.callout)
     }

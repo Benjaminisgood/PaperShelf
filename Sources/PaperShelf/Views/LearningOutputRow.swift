@@ -13,17 +13,6 @@ extension LearningOutput {
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .presentation: return "汇报幻灯片、讲稿与预览"
-        case .guide: return "研究脉络、方法解析与自测"
-        case .markdown: return "可编辑的结构化研读笔记"
-        case .source: return "完整原文与逐页来源"
-        case .dataset: return "自定义字段、数据表与知识图谱"
-        case .agent: return "基于全文证据的文献问答"
-        }
-    }
-
     var symbol: String {
         switch self {
         case .presentation: return "rectangle.stack"
@@ -73,8 +62,9 @@ struct LearningOutputRow<Actions: View>: View {
                             .accessibilityLabel("已有资料")
                     }
                 }
-                Text(isGenerating ? "正在处理…" : output.subtitle)
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if isGenerating {
+                    Text("正在处理…").font(.caption).foregroundStyle(.secondary)
+                }
                 if let run, !isGenerating {
                     Text(run.createdAt, format: .dateTime.month().day().hour().minute())
                         .font(.caption2).foregroundStyle(.tertiary)
